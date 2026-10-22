@@ -148,6 +148,14 @@ canvas { display: block; touch-action: pan-y; }
 .crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .readout { white-space: normal; min-height: 36px; line-height: 1.45; }
 
+/* chart reading */
+.ta-head { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 12px 14px 4px; }
+.ta-notes { margin: 6px 0 4px; padding: 0 14px 0 30px; display: grid; gap: 6px; font-size: 14px; line-height: 1.45; }
+.ta-notes li::marker { color: var(--ink3); }
+.ta-levels { border-top: .5px solid var(--sep); margin-top: 8px; }
+.ta-levels .kv small { display: block; font-size: 11.5px; color: var(--ink3); }
+.ta-now span:nth-child(2) { color: var(--accent); }
+
 /* options */
 .opt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 4px; flex-wrap: wrap; }
 .opt { padding: 12px 14px; display: grid; gap: 5px; position: relative; }
@@ -271,7 +279,9 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       <div class="cbox" id="pcBox"><canvas id="pc" aria-label="Candlestick chart"></canvas></div>
       <div class="crow"><div class="legend" id="cLegend" style="margin:0"></div><div class="seg" id="rangeRow" role="group" aria-label="Range" style="width:132px"><span id="rangeSeg" style="display:contents"><button data-n="60">3M</button><button data-n="120">6M</button><button data-n="250">1Y</button></span></div></div>
     </div>
-    <div class="gh">Levels for the next session</div>
+    <div class="gh">What the chart says <span>daily</span></div>
+    <div class="card" id="taCard" style="padding:0"></div>
+    <div class="gh">Turtle levels for the next session</div>
     <div class="list" id="cLevels"></div>
     <div class="gh">Options <span id="ocAsOf"></span></div>
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
@@ -349,7 +359,7 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
-  sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
+  sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
 };
 
 /* ---------- time ---------- */
@@ -625,7 +635,7 @@ function paintChartControls() {
   $$("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.n === S.n));
   $("#rangeRow").hidden = S.iv !== "1D";
   $("#maChips").innerHTML = MA_DEF.map(([k, , , col]) => `<button class="chip" data-ma="${k}" aria-pressed="${S.mas.includes(k)}"><i style="background:var(${col})"></i>${k}</button>`).join("") +
-    `<button class="chip" data-opt="turtle" aria-pressed="${S.turtle}"><i style="background:var(--accent)"></i>20/55D</button><button class="chip" data-opt="vol" aria-pressed="${S.vol}"><i style="background:var(--ink3)"></i>Volume</button>`;
+    `<button class="chip" data-opt="pat" aria-pressed="${S.pat}"><i style="background:var(--down)"></i>Patterns</button><button class="chip" data-opt="turtle" aria-pressed="${S.turtle}"><i style="background:var(--accent)"></i>20/55D</button><button class="chip" data-opt="vol" aria-pressed="${S.vol}"><i style="background:var(--ink3)"></i>Volume</button>`;
 }
 
 function drawChart() {
@@ -656,6 +666,8 @@ function drawChart() {
   let lo = Math.min(...view.map(x => x.l)), hi = Math.max(...view.map(x => x.h)); const base = hi - lo || hi * .01;
   const extraVals = [...mas.flatMap(m => m.vals.filter(isFinite)), ...(ch ? ch.flatMap(c => [c.hi55, c.lo55]).filter(isFinite) : []), ...(ltp && (daily || view.at(-1).d === ist().date) ? [ltp] : [])];
   lv.forEach(([, v]) => { if (v >= lo - base * .6 && v <= hi + base * .6) extraVals.push(v); });
+  const ta = daily && S.pat ? analyzeDaily(se) : null;
+  if (ta) { [ta.res[0], ta.sup[0]].filter(Boolean).forEach(z => { const v = z.mid; if (v >= lo - base * .35 && v <= hi + base * .35) extraVals.push(z.lo, z.hi); }); }
   extraVals.forEach(v => { if (v < lo) lo = v; if (v > hi) hi = v; });
   const pad = (hi - lo) * .05; lo -= pad; hi += pad;
   const L = 2, R = 50, Tp = 6, B = 18, plotB = h - B, priceB = S.vol ? Tp + (plotB - Tp) * .78 : plotB, volT = priceB + 6;
@@ -702,6 +714,7 @@ function drawChart() {
   lv.forEach(([name, v, col, dash]) => { if (v < lo || v > hi) { offTags.push([name, v, v > hi]); return; }
     const yy = Math.round(y(v)) + .5; g.strokeStyle = col; g.lineWidth = name.startsWith("55") ? 1.6 : 1; g.setLineDash(dash); g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.setLineDash([]);
     g.fillStyle = col; g.textAlign = "right"; g.textBaseline = "bottom"; g.font = `600 10px ${tok("--font")}`; g.fillText(name, w - R - 4, yy - 2); g.font = `500 10.5px ${tok("--font")}`; });
+  if (ta) taDraw(g, ta, start, n, x, y, w, R, lo, hi);
   // moving averages
   mas.forEach(m => { g.strokeStyle = m.col; g.lineWidth = 1.4; g.beginPath(); let s = false; m.vals.forEach((v, i) => { if (!isFinite(v)) { s = false; return; } s ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); s = true; }); g.stroke(); });
   // candles
@@ -730,6 +743,7 @@ function drawChart() {
 }
 function legend(mas, live) {
   const parts = (mas || []).map(m => `<span><i style="background:${m.col}"></i>${m.name}</span>`);
+  if (S.pat && S.iv === "1D") parts.push(`<span><i style="background:var(--down);opacity:.5"></i>Resistance</span><span><i style="background:var(--up);opacity:.5"></i>Support / trend lines</span>`);
   if (S.turtle) parts.push(S.iv === "1D" ? `<span><i style="background:var(--accent)"></i>55D</span><span><i class="dash"></i>20D</span>` : `<span><i style="background:var(--accent)"></i>55D level</span><span><i class="dash"></i>20D level</span>`);
   if (live) parts.push(`<span><i style="background:var(--amber)"></i>Live</span>`);
   if (S.iv === "1D" && S.bars[S.sym]?.data?.days && dailySeries(S.prices.get(S.sym), liveRow()).at(-1).prov) parts.push(`<span>Hollow candle = today so far</span>`);
@@ -739,11 +753,240 @@ function headerAndLevels(se, lr) {
   const ltp = lr?.ltp, last = se.at(-1), prev = se.at(-2), ref = ltp ?? last.close, nx = channels(se, se.length);
   const chg = ltp ? lr.chg ?? (ltp / last.close - 1) * 100 : (last.close / prev.close - 1) * 100;
   $("#cSym").textContent = S.sym; $("#cPx").textContent = fmt(ref);
+  if (S.taFor !== S.sym + se.length) { S.taFor = S.sym + se.length; renderTA(); }
   $("#cSub").innerHTML = `<span class="${chg >= 0 ? "up" : "down"}">${pct(chg)}</span> · ${ltp ? "live" : "close " + niceDate(last.date)}`;
   const row = (k, v, cls) => `<div class="kv"><span>${k}</span><span>${fmt(v)}</span><span class="${cls || ""}">${isFinite(v) ? pct((v / ref - 1) * 100) + " away" : ""}</span></div>`;
   $("#cLevels").innerHTML = row("55D high", nx.hi55, "up") + row("20D high", nx.hi20, "up") + row("20D low", nx.lo20, "down") + row("55D low", nx.lo55, "down") +
     `<div class="kv"><span>ATR 20</span><span>${fmt(nx.atr)}</span><span></span></div><div class="kv"><span>Near zone (${S.live?.near_atr ?? 0.3}× ATR)</span><span>${fmt(nx.atr * (S.live?.near_atr ?? 0.3))}</span><span></span></div>`;
 }
+/* ---------- DAILY CHART READING ---------- */
+// Works on the stored daily candles (se: [{date, open, high, low, close, volume}]), oldest first.
+const TA_K = 5;          // a swing high/low must be the extreme of 5 days on each side
+const TA_LOOK = 250;     // days analysed
+function taATR(se, end, n = 14) {
+  let s = 0, k = 0;
+  for (let i = Math.max(1, end - n); i < end; i++) { const pc = se[i - 1].close; s += Math.max(se[i].high - se[i].low, Math.abs(se[i].high - pc), Math.abs(se[i].low - pc)); k++; }
+  return k ? s / k : NaN;
+}
+function taPivots(se, from) {
+  const raw = [];
+  for (let i = Math.max(from, TA_K); i < se.length - TA_K; i++) {
+    let isH = true, isL = true;
+    for (let j = i - TA_K; j <= i + TA_K; j++) { if (j === i) continue; if (se[j].high >= se[i].high) isH = false; if (se[j].low <= se[i].low) isL = false; }
+    if (isH) raw.push({ i, p: se[i].high, t: "H" });
+    if (isL) raw.push({ i, p: se[i].low, t: "L" });
+  }
+  // keep them alternating: of two highs in a row keep the higher, of two lows the lower
+  const out = [];
+  for (const q of raw) {
+    const last = out.at(-1);
+    if (last && last.t === q.t) { if ((q.t === "H" && q.p > last.p) || (q.t === "L" && q.p < last.p)) out[out.length - 1] = q; }
+    else out.push(q);
+  }
+  return out;
+}
+function taZones(piv, atr, close) {
+  const pts = piv.map(p => ({ ...p })).sort((a, b) => a.p - b.p), tol = 0.6 * atr, groups = [];
+  for (const p of pts) {
+    const g = groups.at(-1);
+    if (g && p.p - g.mean <= tol) { g.pts.push(p); g.mean = g.pts.reduce((s, x) => s + x.p, 0) / g.pts.length; }
+    else groups.push({ pts: [p], mean: p.p });
+  }
+  return groups.map(g => {
+    const lo = Math.min(...g.pts.map(x => x.p)), hi = Math.max(...g.pts.map(x => x.p)), pad = Math.max(0, 0.3 * atr - (hi - lo)) / 2;
+    return { lo: lo - pad, hi: hi + pad, mid: g.mean, touches: g.pts.length, last: Math.max(...g.pts.map(x => x.i)), first: Math.min(...g.pts.map(x => x.i)),
+      kind: g.mean > close ? "R" : "S" };
+  });
+}
+function taLine(se, piv, type, atr, from) {
+  const pts = piv.filter(p => p.t === type && p.i >= from).slice(-7), last = se.length - 1;
+  let best = null;
+  for (let a = 0; a < pts.length; a++) for (let b = a + 1; b < pts.length; b++) {
+    const A = pts[a], B = pts[b]; if (B.i - A.i < 10) continue;
+    const m = (B.p - A.p) / (B.i - A.i), at = x => A.p + m * (x - A.i);
+    // the line must not be cut by closes between its anchors and up to 10 days ago
+    let ok = true;
+    for (let x = A.i; x <= last - 10; x++) { const c = se[x].close; if (type === "H" ? c > at(x) + 0.3 * atr : c < at(x) - 0.3 * atr) { ok = false; break; } }
+    if (!ok) continue;
+    const touches = pts.filter(p => p.i >= A.i && Math.abs(p.p - at(p.i)) <= 0.35 * atr).length;
+    if (touches < 2) continue;
+    const score = touches * 10 + B.i / se.length;
+    if (!best || score > best.score) best = { a: A, b: B, m, at, touches, score, type };
+  }
+  if (!best) return null;
+  const now = best.at(last), c = se[last].close;
+  if (Math.abs(now - c) > 4 * atr) return null;
+  best.flat = Math.abs(best.m * 20) < 0.5 * atr;
+  best.dir = best.flat ? "flat" : best.m > 0 ? "rising" : "falling";
+  // a break: a recent close on the wrong side of the line
+  best.broke = null;
+  for (let x = Math.max(best.b.i + 1, last - 9); x <= last; x++) {
+    const cx = se[x].close;
+    if (type === "H" ? cx > best.at(x) + 0.2 * atr : cx < best.at(x) - 0.2 * atr) { best.broke = x; break; }
+  }
+  if (best.broke != null && (type === "H" ? c < best.at(last) : c > best.at(last))) best.broke = null; // went back inside
+  return best;
+}
+function taDouble(se, piv, atr) {
+  const last = se.length - 1, c = se[last].close, out = [];
+  for (const t of ["H", "L"]) {
+    const ps = piv.filter(p => p.t === t && p.i >= last - 70).slice(-2);
+    if (ps.length < 2) continue;
+    const [p1, p2] = ps; if (p2.i - p1.i < 8) continue;
+    if (Math.abs(p1.p - p2.p) > Math.max(0.6 * atr, p2.p * 0.015)) continue;
+    const mid = se.slice(p1.i, p2.i + 1), neck = t === "H" ? Math.min(...mid.map(x => x.low)) : Math.max(...mid.map(x => x.high));
+    const depth = t === "H" ? Math.max(p1.p, p2.p) - neck : neck - Math.min(p1.p, p2.p);
+    if (depth < 2.5 * atr) continue;
+    if (t === "H" && c > Math.max(p1.p, p2.p) + 0.3 * atr) continue;   // already above the tops: no longer a top
+    if (t === "L" && c < Math.min(p1.p, p2.p) - 0.3 * atr) continue;
+    const confirmed = t === "H" ? c < neck : c > neck;
+    out.push({ kind: t === "H" ? "Double top" : "Double bottom", p1, p2, neck, confirmed, bull: t === "L" });
+  }
+  return out;
+}
+function taCandle(se) {
+  const n = se.length, d = se[n - 1], p = se[n - 2]; if (!p) return null;
+  const body = Math.abs(d.close - d.open), range = d.high - d.low || 1e-9, up = d.high - Math.max(d.open, d.close), dn = Math.min(d.open, d.close) - d.low;
+  const ma20 = se.slice(-20).reduce((s, x) => s + x.close, 0) / Math.min(20, n);
+  const pb = Math.abs(p.close - p.open);
+  if (p.close < p.open && d.close > d.open && d.close >= p.open && d.open <= p.close && body > pb) return ["Bullish engulfing", "buyers took over yesterday's selling", true];
+  if (p.close > p.open && d.close < d.open && d.close <= p.open && d.open >= p.close && body > pb) return ["Bearish engulfing", "sellers took over yesterday's buying", false];
+  if (dn >= 2 * body && up <= Math.max(body, range * 0.1) && d.close < ma20 * 1.01) return ["Hammer", "buyers pushed back from the day's low", true];
+  if (up >= 2 * body && dn <= Math.max(body, range * 0.1) && d.close > ma20 * 0.99) return ["Shooting star", "sellers pushed back from the day's high", false];
+  if (body <= 0.1 * range) return ["Doji", "indecision after the recent move", null];
+  if (d.high < p.high && d.low > p.low) return ["Inside day", "a pause inside yesterday's range; watch which side breaks", null];
+  return null;
+}
+function taMA(se, n, end = se.length) { if (end < n) return NaN; let s = 0; for (let i = end - n; i < end; i++) s += se[i].close; return s / n; }
+
+function analyzeDaily(se) {
+  if (!se || se.length < 60) return null;
+  const last = se.length - 1, c = se[last].close, atr = taATR(se, se.length), from = Math.max(0, se.length - TA_LOOK);
+  const piv = taPivots(se, from);
+  const H = piv.filter(p => p.t === "H"), L = piv.filter(p => p.t === "L");
+  // trend from swing structure
+  let trend = "Sideways", why = "highs and lows are not making a clear sequence";
+  if (H.length >= 2 && L.length >= 2) {
+    const hh = H.at(-1).p > H.at(-2).p, hl = L.at(-1).p > L.at(-2).p;
+    if (hh && hl) { trend = "Uptrend"; why = "higher highs and higher lows"; }
+    else if (!hh && !hl) { trend = "Downtrend"; why = "lower highs and lower lows"; }
+    else if (hh && !hl) why = "a higher high but a lower low (widening swings)";
+    else why = "a lower high but a higher low (swings narrowing)";
+  }
+  const ma50 = taMA(se, 50), ma200 = taMA(se, 200), ma50p = taMA(se, 50, se.length - 10);
+  const notes = [];
+  const pctTo = v => ((v / c - 1) * 100);
+  let maTxt = "";
+  if (isFinite(ma50)) maTxt = `Price is ${c >= ma50 ? "above" : "below"} the 50-day average (${fmt(ma50)}), which is ${ma50 > ma50p ? "rising" : "falling"}`;
+  if (isFinite(ma200)) maTxt += `, and ${c >= ma200 ? "above" : "below"} the 200-day (${fmt(ma200)})`;
+  if (maTxt) maTxt += ".";
+  // crosses in the last 10 days
+  let cross = null;
+  if (se.length >= 210) for (let k = 0; k < 10; k++) {
+    const e = se.length - k, a1 = taMA(se, 50, e) - taMA(se, 200, e), a0 = taMA(se, 50, e - 1) - taMA(se, 200, e - 1);
+    if (a1 > 0 && a0 <= 0) { cross = ["Golden cross", "the 50-day average crossed above the 200-day", true, e - 1]; break; }
+    if (a1 < 0 && a0 >= 0) { cross = ["Death cross", "the 50-day average crossed below the 200-day", false, e - 1]; break; }
+  }
+  // zones
+  const zones = taZones(piv, atr, c);
+  const res = zones.filter(z => z.lo > c).sort((a, b) => a.lo - b.lo).filter(z => z.touches >= 2 || z.lo - c < 3 * atr).slice(0, 2);
+  const sup = zones.filter(z => z.hi < c).sort((a, b) => b.hi - a.hi).filter(z => z.touches >= 2 || c - z.hi < 3 * atr).slice(0, 2);
+  const inside = zones.filter(z => z.lo <= c && z.hi >= c && z.touches >= 2);
+  // trend lines
+  const lineFrom = Math.max(0, se.length - 180);
+  const rl = taLine(se, piv, "H", atr, lineFrom), sl = taLine(se, piv, "L", atr, lineFrom);
+  const lines = [rl, sl].filter(Boolean);
+  // patterns
+  const patterns = [];
+  if (rl && sl && !rl.broke && !sl.broke) {
+    const start = Math.max(rl.a.i, sl.a.i), g0 = rl.at(start) - sl.at(start), g1 = rl.at(last) - sl.at(last);
+    if (g1 > 0) {
+      const conv = g1 < g0 * 0.7;
+      let name = null, bull = null, conf = "";
+      if (conv && rl.flat && sl.dir === "rising") { name = "Ascending triangle"; bull = true; conf = `a daily close above ${fmt(rl.at(last))} would confirm the breakout`; }
+      else if (conv && sl.flat && rl.dir === "falling") { name = "Descending triangle"; bull = false; conf = `a daily close below ${fmt(sl.at(last))} would confirm the breakdown`; }
+      else if (conv && rl.dir === "falling" && sl.dir === "rising") { name = "Symmetrical triangle"; conf = `a close outside ${fmt(sl.at(last))}–${fmt(rl.at(last))} shows the direction`; }
+      else if (!conv && rl.dir === "rising" && sl.dir === "rising") { name = "Rising channel"; bull = true; conf = `support of the channel is near ${fmt(sl.at(last))}`; }
+      else if (!conv && rl.dir === "falling" && sl.dir === "falling") { name = "Falling channel"; bull = false; conf = `resistance of the channel is near ${fmt(rl.at(last))}`; }
+      if (name) patterns.push({ kind: name, bull, text: `${name}: ${rl.touches} touches on the upper line, ${sl.touches} on the lower; ${conf}.`, lines: true });
+    }
+  }
+  for (const d of taDouble(se, piv, atr)) {
+    const days = Math.round((d.p2.i - d.p1.i));
+    patterns.push({ kind: d.kind, bull: d.bull, d, text: d.confirmed
+      ? `${d.kind} confirmed: two ${d.bull ? "lows" : "highs"} near ${fmt((d.p1.p + d.p2.p) / 2)} (${days} days apart), and price has closed ${d.bull ? "above" : "below"} the neckline at ${fmt(d.neck)}.`
+      : `Possible ${d.kind.toLowerCase()}: two ${d.bull ? "lows" : "highs"} near ${fmt((d.p1.p + d.p2.p) / 2)}, ${days} days apart. It confirms on a close ${d.bull ? "above" : "below"} ${fmt(d.neck)}.` });
+  }
+  const box = se.slice(-20), bHi = Math.max(...box.map(x => x.high)), bLo = Math.min(...box.map(x => x.low));
+  if (bHi - bLo <= 3 * atr && !patterns.length) patterns.push({ kind: "Tight range", bull: null, box: { hi: bHi, lo: bLo, from: se.length - 20 },
+    text: `Tight range: the last 20 days stayed between ${fmt(bLo)} and ${fmt(bHi)}, only about ${((bHi - bLo) / atr).toFixed(1)}× the average daily range. A close outside it often starts the next move.` });
+  for (const l of lines) if (l.broke != null) {
+    const dt = niceDate(se[l.broke].date);
+    patterns.unshift({ kind: l.type === "H" ? "Trend line breakout" : "Trend line breakdown", bull: l.type === "H",
+      text: l.type === "H" ? `Broke above its ${l.dir} resistance line on ${dt}.` : `Broke below its ${l.dir} support line on ${dt}.` });
+  }
+  const candle = taCandle(se);
+  // plain-language summary
+  const head = { Uptrend: "up", Downtrend: "down", Sideways: "sideways" }[trend];
+  notes.push(`<b>${trend}</b>: ${why}${H.length ? `, last swing high ${fmt(H.at(-1).p)} (${niceDate(se[H.at(-1).i].date)})` : ""}${L.length ? `, last swing low ${fmt(L.at(-1).p)} (${niceDate(se[L.at(-1).i].date)})` : ""}.`);
+  if (maTxt) notes.push(maTxt);
+  if (cross) notes.push(`${cross[0]} on ${niceDate(se[cross[3]].date)}: ${cross[1]}.`);
+  if (inside.length) notes.push(`Price is inside a ${inside[0].kind === "R" ? "resistance" : "support"} zone ${fmt(inside[0].lo)}–${fmt(inside[0].hi)} that has held ${inside[0].touches} times.`);
+  for (const p of patterns) notes.push(p.text);
+  if (candle) notes.push(`Last candle: ${candle[0]}, ${candle[1]}.`);
+  return { atr, piv, res, sup, inside, lines, patterns, candle, trend, head, notes, last, pctTo, ma50, ma200 };
+}
+
+function taDraw(g, ta, start, n, x, y, w, R, lo, hi) {
+  const upC = tok("--up"), dnC = tok("--down"), ink2 = tok("--ink2");
+  const vis = v => v >= lo && v <= hi;
+  // support / resistance zones
+  const used = [];
+  [...ta.res.map(z => [z, dnC, "R"]), ...ta.sup.map(z => [z, upC, "S"]), ...ta.inside.map(z => [z, tok("--amber"), "Zone"])].forEach(([z, col, tag]) => {
+    if (z.hi < lo || z.lo > hi) return;
+    const y1 = y(Math.min(z.hi, hi)), y2 = y(Math.max(z.lo, lo)), x0 = Math.max(0, x(z.first - start) - 4);
+    g.fillStyle = col; g.globalAlpha = .12; g.fillRect(x0, y1, w - R - x0, Math.max(2, y2 - y1)); g.globalAlpha = 1;
+    g.fillStyle = col; g.font = `700 10px ${tok("--font")}`; g.textAlign = "right"; g.textBaseline = "bottom";
+    if (used.some(u => Math.abs(u - y1) < 13)) return;
+    used.push(y1);
+    g.fillText(`${tag} ${fmt(z.mid, z.mid >= 1000 ? 0 : 1)}${z.touches > 1 ? " ×" + z.touches : ""}`, w - R - 4, y1 - 1);
+  });
+  // trend lines
+  ta.lines.forEach(l => {
+    const col = l.type === "H" ? dnC : upC, i0 = Math.max(l.a.i, start), i1 = ta.last + 2;
+    if (i1 < start) return;
+    g.strokeStyle = col; g.lineWidth = 1.6; g.setLineDash(l.broke != null ? [5, 4] : []);
+    g.beginPath(); g.moveTo(x(i0 - start), y(l.at(i0))); g.lineTo(x(i1 - start), y(l.at(i1))); g.stroke(); g.setLineDash([]);
+    [l.a, l.b].forEach(p => { if (p.i >= start) { g.fillStyle = col; g.beginPath(); g.arc(x(p.i - start), y(p.p), 3, 0, 7); g.fill(); } });
+  });
+  // double top / bottom
+  ta.patterns.filter(p => p.d).forEach(p => {
+    const { p1, p2, neck } = p.d, col = p.bull ? upC : dnC;
+    [p1, p2].forEach((q, k) => { if (q.i < start) return; const xx = x(q.i - start), yy = y(q.p);
+      g.fillStyle = col; g.font = `700 10px ${tok("--font")}`; g.textAlign = "center"; g.textBaseline = p.bull ? "top" : "bottom"; g.fillText(p.bull ? `B${k + 1}` : `T${k + 1}`, xx, p.bull ? yy + 4 : yy - 4); });
+    if (vis(neck)) { const x0 = Math.max(0, x(Math.max(p1.i, start) - start)); g.strokeStyle = col; g.setLineDash([2, 3]); g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(x0, y(neck)); g.lineTo(w - R, y(neck)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = col; g.font = `600 10px ${tok("--font")}`; g.textAlign = "left"; g.textBaseline = "top"; g.fillText("neckline", x0 + 2, y(neck) + 2); }
+  });
+  // tight range box
+  ta.patterns.filter(p => p.box).forEach(p => { const b = p.box; if (b.from < start) return; const x0 = x(b.from - start) - 4, x1 = x(ta.last - start) + 4;
+    g.strokeStyle = ink2; g.setLineDash([3, 3]); g.lineWidth = 1; g.strokeRect(x0, y(b.hi), x1 - x0, y(b.lo) - y(b.hi)); g.setLineDash([]); });
+  g.font = `500 10.5px ${tok("--font")}`;
+}
+
+function renderTA() {
+  const card = $("#taCard"), se = S.prices?.get(S.sym);
+  const ta = se ? analyzeDaily(se) : null;
+  if (!ta) { card.innerHTML = `<div class="empty">Not enough daily history to read this chart.</div>`; return; }
+  const c = se.at(-1).close;
+  const lvl = (z, kind) => `<div class="kv"><span>${kind === "R" ? "Resistance" : kind === "S" ? "Support" : "Being tested"}${z.touches > 1 ? `<small>tested ${z.touches}×</small>` : ""}</span><span>${fmt(z.lo)}–${fmt(z.hi)}</span><span class="${kind === "R" ? "up" : kind === "S" ? "down" : ""}">${kind === "Z" ? "now" : pct(((kind === "R" ? z.lo : z.hi) / c - 1) * 100)}</span></div>`;
+  const trendCls = ta.trend === "Uptrend" ? "UP" : ta.trend === "Downtrend" ? "DOWN" : "flat";
+  card.innerHTML = `<div class="ta-head"><span class="pill ${trendCls}" style="min-width:0">${ta.trend}</span>${ta.patterns[0] ? `<span class="badge ${ta.patterns[0].bull === true ? "UP" : ta.patterns[0].bull === false ? "DOWN" : "near"}">${esc(ta.patterns[0].kind)}</span>` : ""}${ta.candle ? `<span class="badge ${ta.candle[2] === true ? "UP" : ta.candle[2] === false ? "DOWN" : "near"}">${esc(ta.candle[0])}</span>` : ""}</div>
+    <ul class="ta-notes">${ta.notes.map(t => `<li>${t}</li>`).join("")}</ul>
+    <div class="ta-levels">${ta.res.slice().reverse().map(z => lvl(z, "R")).join("")}${ta.inside.map(z => lvl(z, "Z")).join("")}<div class="kv ta-now"><span>Last close</span><span>${fmt(c)}</span><span></span></div>${ta.sup.map(z => lvl(z, "S")).join("")}</div>
+    <div class="ocfoot">Read automatically from swing highs and lows on the daily chart (each swing is the extreme of 5 days either side). Patterns are approximate; check them on the chart.</div>`;
+}
+
 /* ---------- OPTION CHAIN ---------- */
 function ncdf(x) { const t = 1 / (1 + .2316419 * Math.abs(x)), d = .3989423 * Math.exp(-x * x / 2), p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
 function bs(s, k, t, r, v, call) { const sq = v * Math.sqrt(t), d1 = (Math.log(s / k) + (r + v * v / 2) * t) / sq, d2 = d1 - sq; return call ? s * ncdf(d1) - k * Math.exp(-r * t) * ncdf(d2) : k * Math.exp(-r * t) * ncdf(-d2) - s * ncdf(-d1); }
@@ -962,7 +1205,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-22.4";
+const APP_VERSION = "2026-10-22.5";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
