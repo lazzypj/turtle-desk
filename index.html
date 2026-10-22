@@ -148,6 +148,18 @@ canvas { display: block; touch-action: pan-y; }
 .crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .readout { white-space: normal; min-height: 36px; line-height: 1.45; }
 
+/* options */
+.opt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 4px; flex-wrap: wrap; }
+.opt { padding: 12px 14px; display: grid; gap: 5px; position: relative; }
+.opt + .opt::before, .opt-head + .opt::before { content: ""; position: absolute; left: 14px; right: 0; top: 0; height: .5px; background: var(--sep); }
+.opt-head + .opt::before { display: none; }
+.opt-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.opt-top b { font-size: 16px; font-weight: 700; }
+.opt-px { font-size: 20px; font-weight: 700; }
+.opt-meta, .opt-rule { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink2); }
+.opt-rule span { white-space: nowrap; }
+.tag { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--fill); color: var(--ink2); vertical-align: 2px; }
+
 /* option chain */
 .ocsum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 12px 6px 10px; border-bottom: .5px solid var(--sep); }
 .ocsum div { display: grid; justify-items: center; gap: 1px; min-width: 0; }
@@ -261,7 +273,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     </div>
     <div class="gh">Levels for the next session</div>
     <div class="list" id="cLevels"></div>
-    <div class="gh">Option chain <span id="ocAsOf"></span></div>
+    <div class="gh">Options <span id="ocAsOf"></span></div>
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
   </section>
 
@@ -762,37 +774,47 @@ async function ensureOC(force = false) {
   return ocBusy;
 }
 const big = v => v == null ? "–" : v >= 1e7 ? (v / 1e7).toFixed(1) + "Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v >= 1e3 ? (v / 1e3).toFixed(1) + "K" : String(v);
+function biasFor(sym) {
+  const r = S.live?.date === ist().date ? S.live.rows.filter(x => x.symbol === sym).sort((a, b) => b.top - a.top)[0] : null;
+  if (r) return r.side === "UP" ? "CE" : "PE";
+  const sg = S.signals.find(x => x.symbol === sym);
+  if (sg) return T(sg.long_20) || T(sg.long_55) ? "CE" : "PE";
+  return null;
+}
 function renderOC() {
   const card = $("#ocCard"), d = S.oc?.stocks?.[S.sym];
   if (!d) {
     $("#ocAsOf").textContent = "";
-    card.innerHTML = `<div class="empty">${S.oc ? `No option chain for ${esc(S.sym)} yet.` : "No option chains saved yet."} Chains are saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
+    card.innerHTML = `<div class="empty">${S.oc ? `No option data for ${esc(S.sym)} yet.` : "No option data saved yet."} It is saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
     return;
   }
+  const bias = biasFor(S.sym);
+  if (!S.ocSideFor || S.ocSideFor !== S.sym) { S.ocSide = bias || "CE"; S.ocSideFor = S.sym; }
+  const side = S.ocSide, call = side === "CE", ai = d.k.indexOf(d.atm);
   const up = ist(new Date(S.oc.updated));
-  $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up.date === ist().date ? "today" : niceDate(up.date)} ${up.hm}`;
-  const maxOI = Math.max(1, ...d.c.map(x => x?.[1] || 0), ...d.p.map(x => x?.[1] || 0));
-  const spotIdx = d.k.findIndex(k => k > d.spot);
-  const expTxt = d.exp === "sample" ? "Sample" : niceDate(d.exp);
-  const rows = d.k.map((k, i) => {
-    const c = d.c[i], p = d.p[i], citm = k < d.spot ? " itm" : "", pitm = k > d.spot ? " itm" : "";
-    const w = x => `--w:${Math.round(((x?.[1] || 0) / maxOI) * 100)}%`;
-    return `<tr class="${k === d.atm ? "atm" : ""}${i === spotIdx ? " spot" : ""}">
-      <td class="co${citm}" style="${w(c)}">${big(c?.[1])}</td>
-      <td class="${citm.trim()}">${c ? fmt(c[0]) : "–"}<small>${c?.[2] != null ? c[2] + "%" : "–"}</small></td>
-      <td class="k">${fmt(k, k % 1 ? 1 : 0)}</td>
-      <td class="pl${pitm}">${p ? fmt(p[0]) : "–"}<small>${p?.[2] != null ? p[2] + "%" : "–"}</small></td>
-      <td class="po${pitm}" style="${w(p)}">${big(p?.[1])}</td></tr>`;
+  $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up.date === ist().date ? "" : niceDate(up.date) + " "}${up.hm}`;
+  const expDate = d.exp === "sample" ? null : new Date(d.exp + "T15:30:00+05:30");
+  const tY = expDate ? Math.max((expDate - new Date()) / 31536e6, 1 / 365 / 24) : 12 / 365;
+  const days = expDate ? Math.max(0, Math.ceil((expDate - new Date()) / 864e5)) : null;
+  const picks = [["ATM", ai], ["1 ITM", call ? ai - 1 : ai + 1]].filter(([, i]) => i >= 0 && i < d.k.length);
+  const rows = picks.map(([tag, i]) => {
+    const k = d.k[i], o = (call ? d.c : d.p)[i];
+    if (!o || !o[0]) return `<div class="opt"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="cap">No trades in this strike</div></div>`;
+    const [ltp, oi, iv, vol] = o, sig = (iv || d.iv || 30) / 100;
+    const sq = sig * Math.sqrt(tY), d1 = (Math.log(d.spot / k) + (0.065 + sig * sig / 2) * tY) / sq, delta = call ? ncdf(d1) : ncdf(d1) - 1;
+    const perPct = Math.abs(delta) * d.spot * 0.01, lot = d.lot || 0;
+    const rs = v => "₹" + fmt(v);
+    return `<div class="opt">
+      <div class="opt-top"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="opt-px">${rs(ltp)}</div></div>
+      <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
+      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>
+    </div>`;
   }).join("");
-  card.innerHTML = `<div class="ocsum">
-      <div><b>${expTxt}</b><small>Expiry · lot ${d.lot ?? "–"}</small></div>
-      <div><b class="${d.pcr >= 1 ? "up" : d.pcr ? "down" : ""}">${d.pcr != null ? d.pcr.toFixed(2) : "–"}</b><small>PCR (OI)</small></div>
-      <div><b>${d.mp != null ? fmt(d.mp, 0) : "–"}</b><small>Max pain</small></div>
-      <div><b>${d.iv != null ? d.iv + "%" : "–"}</b><small>ATM IV</small></div></div>
-    <table class="octbl"><thead><tr><th class="side" colspan="2" style="text-align:right">Calls</th><th>Strike</th><th class="side" colspan="2" style="text-align:left">Puts</th></tr>
-      <tr><th style="text-align:right">OI</th><th style="text-align:right">LTP · IV</th><th></th><th style="text-align:left">LTP · IV</th><th style="text-align:left">OI</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    <div class="ocfoot">Spot ${fmt(d.spot)} when captured (amber line). Shaded cells are in the money. PCR and max pain use the ${d.k.length} strikes shown; IV is calculated from LTP.</div>`;
+  card.innerHTML = `<div class="opt-head">
+      <div class="seg" id="ocSideSeg" role="group" aria-label="Calls or puts" style="width:150px"><button data-oside="CE" aria-pressed="${call}">Calls</button><button data-oside="PE" aria-pressed="${!call}">Puts</button></div>
+      <div class="cap">${bias ? `Signal: ${bias === "CE" ? "breakout → calls" : "breakdown → puts"}` : "No signal today"}</div></div>
+    ${rows}
+    <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target and stop use your 20–30% / 10–15% rule on the last traded premium.</div>`;
 }
 async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); }
 
@@ -908,6 +930,7 @@ document.addEventListener("click", e => {
   const rb = e.target.closest("#rangeSeg button"); if (rb) { S.n = +rb.dataset.n; store.set("n", S.n); S.hover = null; paintChartControls(); return drawChart(); }
   const ib = e.target.closest("#ivSeg button"); if (ib) { S.iv = ib.dataset.iv; store.set("iv", S.iv); S.hover = null; paintChartControls(); drawChart(); if (S.iv !== "1D") ensureBars(S.sym).then(() => drawChart()); return; }
   const mc = e.target.closest("[data-ma]"); if (mc) { const k = mc.dataset.ma; S.mas = S.mas.includes(k) ? S.mas.filter(x => x !== k) : [...S.mas, k]; store.set("mas", S.mas.join(",")); paintChartControls(); return drawChart(); }
+  const os = e.target.closest("[data-oside]"); if (os) { S.ocSide = os.dataset.oside; return renderOC(); }
   const oc2 = e.target.closest("[data-opt]"); if (oc2) { const k = oc2.dataset.opt; S[k] = !S[k]; store.set(k, S[k] ? "1" : "0"); paintChartControls(); return drawChart(); }
   const mb = e.target.closest("#modeSeg button"); if (mb) { S.mode = mb.dataset.m; return paintRun(); }
   if (e.target.closest("#kiteLogin[aria-disabled]")) { e.preventDefault(); $("#setDetails").open = true; $("#apiKey").focus(); return; }
@@ -938,13 +961,26 @@ let lastW = 0;
 new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect().width); if (w === lastW) return; lastW = w; if (S.tab === "day") drawBreadth(); if (S.tab === "chart") drawChart(); }).observe($("main"));
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
+/* ---------- update check ---------- */
+const APP_VERSION = "2026-10-22.4";
+async function checkUpdate() {
+  try {
+    const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
+    const v = (await r.json()).v;
+    if (v && v !== APP_VERSION && !$("#updNote")) {
+      const n = document.createElement("div"); n.id = "updNote"; n.className = "note"; n.innerHTML = `<span class="i">↑</span><p>A new version of Turtle Desk is ready.</p><button id="updBtn">Update</button>`;
+      $("main").prepend(n); $("#updBtn").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(v));
+    }
+  } catch {}
+}
+
 /* ---------- boot ---------- */
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
 go(["live", "day", "chart", "run"].includes(S.tab) ? S.tab : "live");
-refresh();
+refresh(); checkUpdate();
 setInterval(() => { paintStatus(); if (document.visibilityState === "visible" && S.token && market().k !== "closed" && S.tab !== "run") refresh(); }, 30000);
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) refresh(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { checkUpdate(); if (S.token) refresh(); } });
 })();
 </script>
 </body>
