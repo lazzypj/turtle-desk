@@ -283,11 +283,12 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       </div>
       <div class="frow">
         <div class="flabel"><span class="stepnum">3</span>Choose and start</div>
-        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button></div>
+        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button><button data-m="backtest" aria-pressed="false">Backtest</button></div>
         <div class="two" id="liveOpts">
           <div><label for="mins">Minutes</label><input type="number" id="mins" min="5" max="120" value="75" inputmode="numeric"></div>
           <div><label for="nearAtr">Near (× ATR)</label><input type="number" id="nearAtr" min="0.05" max="3" step="0.05" value="0.3" inputmode="decimal"></div>
         </div>
+        <div id="btOpts"><label for="btDays">Days to test</label><input type="number" id="btDays" min="60" max="400" value="180" inputmode="numeric"></div>
         <div class="hint" id="modeHint"></div>
       </div>
     </div>
@@ -818,13 +819,13 @@ function reqToken() { const raw = $("#redirect").value.trim(); if (!raw) return 
 function paintRun() {
   const t = reqToken(), m = market(), mode = S.mode || (m.k === "closed" ? "daily" : "intraday");
   $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
-  $("#liveOpts").hidden = mode !== "intraday";
+  $("#liveOpts").hidden = mode !== "intraday"; $("#btOpts").hidden = mode !== "backtest";
   $("#runCap").textContent = !S.token ? "Connect GitHub below to start runs." : m.k === "open" ? `Market open · ${930 - m.t.mins} minutes left` : m.k === "pre" ? "Start the live watch before 09:15" : "Market closed · run the day-end scan";
-  $("#modeHint").textContent = mode === "intraday"
+  $("#modeHint").textContent = mode === "backtest" ? "One-off study of past breakouts with simulated option trades. Takes about 15–20 minutes; results appear in the repo under data/backtest." : mode === "intraday"
     ? (m.k === "closed" ? "The market is closed, so a live watch would stop at once." : "Free GitHub minutes cover about 75 minutes a trading day.")
-    : (m.k === "open" ? "Today’s candle is still forming. Best after 15:35." : "Updates price history and the day-end list. Takes about 2 minutes.");
+    : (m.k === "open" ? "Today’s candle is still forming. Best after 15:35." : "Updates price history, option chains and minute candles. Takes about 4 minutes.");
   $("#startBtn").disabled = !(t && S.token);
-  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : "Run day-end scan";
+  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : mode === "backtest" ? "Run backtest" : "Run day-end scan";
   const raw = $("#redirect").value.trim();
   $("#tokState").innerHTML = t ? `<span class="ok">Token found ·${esc(t.slice(-4))}</span> Start now, it expires in a few minutes.` : raw ? `<span class="bad">No request_token in this text.</span> Copy the full Example Domain address.` : "The token works once and expires in a few minutes.";
   $("#n2").className = "stepnum" + (t ? " done" : "");
@@ -837,10 +838,11 @@ async function startRun() {
   const t = reqToken(), m = market(), mode = S.mode || (m.k === "closed" ? "daily" : "intraday"); if (!t) return;
   const b = $("#startBtn"); b.disabled = true; b.textContent = "Starting…";
   const inputs = { request_token: t };
+  if (mode === "backtest") inputs.days = String(Math.max(60, Math.min(400, +$("#btDays").value || 180)));
   if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); }
   try {
-    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
-    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : "Day-end scan started. Takes about 2 minutes.");
+    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : mode === "backtest" ? "backtest.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
+    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : mode === "backtest" ? "Backtest started. Takes about 15–20 minutes." : "Day-end scan started. Takes about 4 minutes.");
     pollRuns(18);
   } catch (e) { toast(e.message, 6000); }
   paintRun();
@@ -857,7 +859,7 @@ async function loadRuns() {
       let why = "";
       if (st === "failure") { try { const j = await gh(`/repos/${S.repo}/actions/runs/${run.id}/jobs`); const s = j?.jobs?.flatMap(x => x.steps || []).find(s => s.conclusion === "failure"); if (s) why = /Fetch|Watch/.test(s.name) ? "Kite login or data step failed. Usually an expired token: log in again and start within a minute." : `Failed at “${s.name}”.`; } catch {} }
       const t = ist(new Date(run.created_at));
-      return `<div class="run"><div><b>${esc(run.name.replace("Intraday Turtle watch", "Live watch").replace("Daily Donchian scan", "Day-end scan"))}</b><div class="cap">${niceDate(t.date)} · ${t.hm} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">log</a></div></div><span class="st ${esc(st)}">${esc(st)}</span>${why ? `<div class="why">${esc(why)}</div>` : ""}</div>`;
+      return `<div class="run"><div><b>${esc(run.name.replace("Intraday Turtle watch", "Live watch").replace("Daily Donchian scan", "Day-end scan").replace("Breakout backtest", "Backtest"))}</b><div class="cap">${niceDate(t.date)} · ${t.hm} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">log</a></div></div><span class="st ${esc(st)}">${esc(st)}</span>${why ? `<div class="why">${esc(why)}</div>` : ""}</div>`;
     }));
     $("#runs").innerHTML = html.join("") || `<div class="empty">No runs yet.</div>`;
     const running = runs.some(r => r.status !== "completed");
