@@ -137,6 +137,25 @@ canvas { display: block; touch-action: pan-y; }
 .search input { border: 0; background: none; padding: 9px 0; font-size: 16px; flex: 1; min-width: 0; outline: none; text-transform: uppercase; }
 .search input::placeholder { text-transform: none; color: var(--ink3); }
 
+/* option chain */
+.ocsum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 12px 6px 10px; border-bottom: .5px solid var(--sep); }
+.ocsum div { display: grid; justify-items: center; gap: 1px; min-width: 0; }
+.ocsum b { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.ocsum small { font-size: 11px; color: var(--ink2); white-space: nowrap; }
+.octbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+.octbl th { font-size: 10.5px; font-weight: 600; color: var(--ink3); text-transform: uppercase; letter-spacing: .04em; padding: 8px 6px 6px; }
+.octbl th.side { color: var(--ink2); font-size: 11px; }
+.octbl td { padding: 6px 6px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: .5px solid var(--sep); }
+.octbl td.k { text-align: center; font-weight: 700; background: var(--fill); }
+.octbl tr.atm td.k { background: var(--accent); color: var(--on-accent); }
+.octbl td.pl, .octbl td.po { text-align: left; }
+.octbl td small { display: block; font-size: 10.5px; color: var(--ink3); margin-top: 1px; }
+.octbl td.itm { background: color-mix(in srgb, var(--amber) 9%, transparent); }
+.octbl td.co { background-image: linear-gradient(to left, color-mix(in srgb, var(--down) 22%, transparent) var(--w), transparent var(--w)); }
+.octbl td.po { background-image: linear-gradient(to right, color-mix(in srgb, var(--up) 22%, transparent) var(--w), transparent var(--w)); }
+.octbl tr.spot td { border-top: 1.5px solid var(--amber); }
+.ocfoot { font-size: 11.5px; color: var(--ink3); padding: 8px 12px 12px; border-top: .5px solid var(--sep); }
+
 /* run / forms */
 .frow { padding: 12px 14px; position: relative; display: grid; gap: 6px; }
 .frow + .frow::before { content: ""; position: absolute; left: 14px; right: 0; top: 0; height: .5px; background: var(--sep); }
@@ -212,7 +231,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <div id="dayLists"></div>
   </section>
 
-  <section id="s-chart" aria-label="Chart">
+  <section id="s-chart" aria-label="Stock">
     <form class="search" id="symForm" role="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
       <input id="symInput" list="symList" placeholder="Search stock" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search">
@@ -230,6 +249,8 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     </div>
     <div class="gh">Levels for the next session</div>
     <div class="list" id="cLevels"></div>
+    <div class="gh">Option chain <span id="ocAsOf"></span></div>
+    <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
   </section>
 
   <section id="s-run" aria-label="Run">
@@ -280,7 +301,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
 <nav class="tabs" aria-label="Sections"><div class="in">
   <button data-tab="live" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Live</button>
   <button data-tab="day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Day end</button>
-  <button data-tab="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>Chart</button>
+  <button data-tab="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>Stock</button>
   <button data-tab="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z" fill="currentColor"/></svg>Run</button>
 </div></nav>
 
@@ -421,8 +442,8 @@ const GROUPS = { UP2: ["Breakouts", "UP"], UP1: ["Near breakout", "UP"], DOWN2: 
 function renderLive() {
   const L = S.live, rows = liveRows(), ls = liveState();
   $("#liveCap").textContent = !L ? "No live run yet. Start one from Run." :
-    ls.k === "sample" ? "Sample data" : ls.k === "live" ? `Updated ${ls.hm} · ${L.stocks} stocks · near = ${L.near_atr}× ATR` :
-    ls.k === "stopped" ? `Watch stopped at ${ls.hm} · ${L.stocks} stocks` : `Last live run ${niceDate(L.date)}`;
+    ls.k === "sample" ? "Sample data" : ls.k === "live" ? `Updated ${ls.hm} · ${L.stocks} F&O stocks · near = ${L.near_atr}× ATR` :
+    ls.k === "stopped" ? `Watch stopped at ${ls.hm} · ${L.stocks} F&O stocks` : `Last live run ${niceDate(L.date)}`;
   const n = k => rows.filter(r => r.g === k).length;
   $("#liveStrip").innerHTML = [["UP2", "▲ Breakout", "up"], ["UP1", "▲ Near", "up"], ["DOWN2", "▼ Breakdown", "down"], ["DOWN1", "▼ Near", "down"]]
     .map(([k, t, c]) => `<button data-lf="${k}" aria-pressed="${S.liveF === k}"><b class="${c}">${L ? n(k) : "–"}</b><small>${t}</small></button>`).join("");
@@ -451,7 +472,7 @@ const DGROUPS = { long_55: ["Closed above 55D high", "UP", 55], long_20: ["Close
 function renderDay() {
   const last = S.summary.at(-1);
   if (!last) { $("#dayCap").textContent = "No day-end scan yet. Run one after 15:30."; $("#dayStrip").innerHTML = ""; $("#dayLists").innerHTML = ""; drawBreadth(); return; }
-  $("#dayCap").textContent = S.sample ? "Sample data" : `Close of ${niceDate(last.date)} · ${last.stocks_scanned} stocks`;
+  $("#dayCap").textContent = S.sample ? "Sample data" : `Close of ${niceDate(last.date)} · ${last.stocks_scanned} F&O stocks`;
   $("#dayStrip").innerHTML = [["long_55", "▲ 55D", "up"], ["long_20", "▲ 20D", "up"], ["short_55", "▼ 55D", "down"], ["short_20", "▼ 20D", "down"]]
     .map(([k, t, c]) => `<button data-df="${k}" aria-pressed="${S.dayF === k}"><b class="${c}">${esc(last[k])}</b><small>${t}</small></button>`).join("");
   const sig = S.signals.filter(r => S.sample || r.date === last.date);
@@ -511,9 +532,11 @@ async function ensurePrices() {
   if (!S.token) { loadSample(); return S.prices; }
   if (!S.pricesLoading) S.pricesLoading = (async () => {
     $("#chartMsg").textContent = "Loading price history…";
-    const t = await file("data/prices.csv"); if (!t) throw new Error("No price history yet. Run a scan first.");
+    const [t, uni] = await Promise.all([file("data/prices.csv"), file("data/universe.csv").catch(() => null)]);
+    if (!t) throw new Error("No price history yet. Run a scan first.");
+    const keep = uni ? new Set(uni.trim().split(/\r?\n/).slice(1).map(x => x.trim())) : null;
     const m = new Map(), lines = t.split("\n"); lines.shift();
-    for (const l of lines) { if (!l) continue; const v = l.split(","); let a = m.get(v[1]); if (!a) m.set(v[1], a = []); a.push({ date: v[0], open: +v[2], high: +v[3], low: +v[4], close: +v[5], volume: +v[6] }); }
+    for (const l of lines) { if (!l) continue; const v = l.split(","); if (keep && !keep.has(v[1])) continue; let a = m.get(v[1]); if (!a) m.set(v[1], a = []); a.push({ date: v[0], open: +v[2], high: +v[3], low: +v[4], close: +v[5], volume: +v[6] }); }
     m.forEach(a => a.sort((x, y) => x.date < y.date ? -1 : 1)); S.prices = m; $("#chartMsg").textContent = ""; return m;
   })().finally(() => { S.pricesLoading = null; });
   return S.pricesLoading;
@@ -526,7 +549,7 @@ async function openChart(sym) {
     if ($("#symList").childElementCount !== m.size) $("#symList").innerHTML = [...m.keys()].sort().map(s => `<option value="${esc(s)}">`).join("");
     if (!m.has(S.sym)) { if (S.sym) $("#chartMsg").innerHTML = `<span class="bad">${esc(S.sym)} is not in the stored history.</span>`; S.sym = [...m.keys()].sort()[0]; }
     else $("#chartMsg").textContent = "";
-    $("#symInput").value = ""; $("#symInput").placeholder = "Search stock · showing " + S.sym; drawChart();
+    $("#symInput").value = ""; $("#symInput").placeholder = "Search stock · showing " + S.sym; drawChart(); showOC();
   } catch (e) { $("#chartMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
 }
 function drawChart() {
@@ -577,6 +600,70 @@ function drawChart() {
   $("#cLevels").innerHTML = row("55D high", nx.hi55, "up") + row("20D high", nx.hi20, "up") + row("20D low", nx.lo20, "down") + row("55D low", nx.lo55, "down") +
     `<div class="kv"><span>ATR 20</span><span>${fmt(nx.atr)}</span><span></span></div><div class="kv"><span>Near zone (${S.live?.near_atr ?? 0.3}× ATR)</span><span>${fmt(nx.atr * (S.live?.near_atr ?? 0.3))}</span><span></span></div>`;
 }
+/* ---------- OPTION CHAIN ---------- */
+function ncdf(x) { const t = 1 / (1 + .2316419 * Math.abs(x)), d = .3989423 * Math.exp(-x * x / 2), p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
+function bs(s, k, t, r, v, call) { const sq = v * Math.sqrt(t), d1 = (Math.log(s / k) + (r + v * v / 2) * t) / sq, d2 = d1 - sq; return call ? s * ncdf(d1) - k * Math.exp(-r * t) * ncdf(d2) : k * Math.exp(-r * t) * ncdf(-d2) - s * ncdf(-d1); }
+function sampleOC() {
+  const stocks = {};
+  for (const [sym, se] of S.prices || []) {
+    const s = se.at(-1).close, step = s > 2000 ? 50 : s > 800 ? 20 : 10, atm = Math.round(s / step) * step, ks = [];
+    for (let i = -10; i <= 10; i++) ks.push(atm + i * step);
+    const t = 12 / 365, c = [], p = [];
+    ks.forEach(k => { const vi = .26 + Math.abs(k / s - 1) * .5; c.push([+bs(s, k, t, .065, vi, true).toFixed(2), Math.round(4e5 * Math.exp(-(((k - s * 1.04) / (s * .05)) ** 2))) * 25, +(vi * 100).toFixed(1), 900]);
+      p.push([+bs(s, k, t, .065, vi, false).toFixed(2), Math.round(3.5e5 * Math.exp(-(((k - s * .96) / (s * .05)) ** 2))) * 25, +(vi * 100).toFixed(1), 700]); });
+    const co = c.reduce((a, x) => a + x[1], 0), po = p.reduce((a, x) => a + x[1], 0);
+    stocks[sym] = { exp: "sample", spot: s, lot: 500, atm, pcr: +(po / co).toFixed(2), mp: atm, iv: 26, k: ks, c, p };
+  }
+  return { sample: true, updated: new Date().toISOString(), stocks };
+}
+let ocBusy = null;
+async function ensureOC(force = false) {
+  if (!S.token) { if (!S.oc?.sample) S.oc = S.prices ? sampleOC() : null; return; }
+  if (!force && S.ocAt && Date.now() - S.ocAt < 60000) return;
+  if (ocBusy) return ocBusy;
+  ocBusy = (async () => {
+    const [a, b] = await Promise.all([file("OC.json", "live").catch(() => null), file("data/oc_dayend.json").catch(() => null)]);
+    const parse = t => { try { return t ? JSON.parse(t) : null; } catch { return null; } };
+    const A = parse(a), B = parse(b);
+    S.oc = !A ? B : !B ? A : (new Date(A.updated) > new Date(B.updated) ? A : B); S.ocAt = Date.now();
+  })().finally(() => { ocBusy = null; });
+  return ocBusy;
+}
+const big = v => v == null ? "–" : v >= 1e7 ? (v / 1e7).toFixed(1) + "Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v >= 1e3 ? (v / 1e3).toFixed(1) + "K" : String(v);
+function renderOC() {
+  const card = $("#ocCard"), d = S.oc?.stocks?.[S.sym];
+  if (!d) {
+    $("#ocAsOf").textContent = "";
+    card.innerHTML = `<div class="empty">${S.oc ? `No option chain for ${esc(S.sym)} yet.` : "No option chains saved yet."} Chains are saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
+    return;
+  }
+  const up = ist(new Date(S.oc.updated));
+  $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up.date === ist().date ? "today" : niceDate(up.date)} ${up.hm}`;
+  const maxOI = Math.max(1, ...d.c.map(x => x?.[1] || 0), ...d.p.map(x => x?.[1] || 0));
+  const spotIdx = d.k.findIndex(k => k > d.spot);
+  const expTxt = d.exp === "sample" ? "Sample" : niceDate(d.exp);
+  const rows = d.k.map((k, i) => {
+    const c = d.c[i], p = d.p[i], citm = k < d.spot ? " itm" : "", pitm = k > d.spot ? " itm" : "";
+    const w = x => `--w:${Math.round(((x?.[1] || 0) / maxOI) * 100)}%`;
+    return `<tr class="${k === d.atm ? "atm" : ""}${i === spotIdx ? " spot" : ""}">
+      <td class="co${citm}" style="${w(c)}">${big(c?.[1])}</td>
+      <td class="${citm.trim()}">${c ? fmt(c[0]) : "–"}<small>${c?.[2] != null ? c[2] + "%" : "–"}</small></td>
+      <td class="k">${fmt(k, k % 1 ? 1 : 0)}</td>
+      <td class="pl${pitm}">${p ? fmt(p[0]) : "–"}<small>${p?.[2] != null ? p[2] + "%" : "–"}</small></td>
+      <td class="po${pitm}" style="${w(p)}">${big(p?.[1])}</td></tr>`;
+  }).join("");
+  card.innerHTML = `<div class="ocsum">
+      <div><b>${expTxt}</b><small>Expiry · lot ${d.lot ?? "–"}</small></div>
+      <div><b class="${d.pcr >= 1 ? "up" : d.pcr ? "down" : ""}">${d.pcr != null ? d.pcr.toFixed(2) : "–"}</b><small>PCR (OI)</small></div>
+      <div><b>${d.mp != null ? fmt(d.mp, 0) : "–"}</b><small>Max pain</small></div>
+      <div><b>${d.iv != null ? d.iv + "%" : "–"}</b><small>ATM IV</small></div></div>
+    <table class="octbl"><thead><tr><th class="side" colspan="2" style="text-align:right">Calls</th><th>Strike</th><th class="side" colspan="2" style="text-align:left">Puts</th></tr>
+      <tr><th style="text-align:right">OI</th><th style="text-align:right">LTP · IV</th><th></th><th style="text-align:left">LTP · IV</th><th style="text-align:left">OI</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="ocfoot">Spot ${fmt(d.spot)} when captured (amber line). Shaded cells are in the money. PCR and max pain use the ${d.k.length} strikes shown; IV is calculated from LTP.</div>`;
+}
+async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); }
+
 function readout() {
   const G = S.geo, el = $("#readout"); if (!G) return;
   if (S.hover == null) { el.textContent = "Drag across the chart to read a day"; return; }
@@ -653,7 +740,7 @@ async function refresh() {
   try {
     if (!S.token) { loadSample(); S.err = ""; }
     else {
-      if (S.sample) { S.sample = false; S.prices = null; }
+      if (S.sample) { S.sample = false; S.prices = null; S.oc = null; S.ocAt = 0; }
       const [lv, sm, sg] = await Promise.all([file("LIVE.json", "live"), file("data/summary.csv"), file("data/signals_latest.csv")]);
       try { S.live = lv ? JSON.parse(lv) : null; } catch { S.live = null; }
       S.summary = csv(sm); S.signals = csv(sg); S.err = "";
@@ -661,7 +748,7 @@ async function refresh() {
   } catch (e) { S.err = e.message; }
   busy = false; $("#refresh").classList.remove("spin");
   notice(); paintStatus(); renderLive(); renderDay(); paintRun();
-  if (S.tab === "chart") S.prices ? drawChart() : openChart();
+  if (S.tab === "chart") { if (S.prices) { drawChart(); showOC(); } else openChart(); }
 }
 
 /* ---------- nav ---------- */
@@ -706,7 +793,7 @@ $("#setForm").addEventListener("submit", async e => {
   } catch (err) { $("#setState").innerHTML = `<span class="bad">${esc(err.message)}</span>`; }
   paintRun();
 });
-$("#forget").addEventListener("click", () => { S.token = ""; store.del("token"); S.prices = null; $("#setState").textContent = "Token removed from this phone."; refresh(); });
+$("#forget").addEventListener("click", () => { S.token = ""; store.del("token"); S.prices = null; S.oc = null; S.ocAt = 0; $("#setState").textContent = "Token removed from this phone."; refresh(); });
 
 // Redraw charts only when their width really changes (iOS fires resize while scrolling as the address bar moves).
 let lastW = 0;
