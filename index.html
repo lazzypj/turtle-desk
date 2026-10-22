@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3F5F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1418" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Turtle Desk">
+<title>Turtle Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: phone-first single column, sticky status header, bottom tab bar; desktop centres a 720px column. */
+:root {
+  --bg: #F3F5F7; --surface: #FFFFFF; --sunk: #E9EDF1; --ink: #15202B; --muted: #5B6875; --line: #DCE2E8;
+  --accent: #1F4E8C; --on-accent: #FFFFFF;
+  --up: #12804A; --down: #C2362F; --warn: #A86A12;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --nav-h: 60px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1418; --surface: #162027; --sunk: #1C2730; --ink: #E6EDF2; --muted: #93A1AD; --line: #26333D;
+  --accent: #7DB2F0; --on-accent: #0E1418; --up: #3FBF7F; --down: #F06A60; --warn: #E0A84A; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E1418; --surface: #162027; --sunk: #1C2730; --ink: #E6EDF2; --muted: #93A1AD; --line: #26333D;
+  --accent: #7DB2F0; --on-accent: #0E1418; --up: #3FBF7F; --down: #F06A60; --warn: #E0A84A; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.stack > .seg { justify-self: start; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 15px/1.45 var(--body);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  -webkit-text-size-adjust: 100%;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 30; }
+.wrap { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 12px; }
+.brand { font: 700 20px/1 var(--display); letter-spacing: .01em; margin: 0; }
+.brand small { display: block; font: 500 11px/1.3 var(--body); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin-top: 3px; }
+.spacer { flex: 1; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font: 600 12px/1.2 var(--body); letter-spacing: .02em; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.chip.open .dot { background: var(--up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 25%, transparent); }
+.chip.pre .dot { background: var(--warn); }
+.icon-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; width: 38px; height: 38px; display: grid; place-items: center; cursor: pointer; }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn.spin svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* banner */
+.banner { margin-top: 14px; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.banner b { color: var(--warn); }
+.banner.err { border-style: solid; border-color: var(--down); background: color-mix(in srgb, var(--down) 9%, var(--surface)); }
+.banner.err b { color: var(--down); }
+
+/* sections */
+main section { display: none; padding-block: 14px 8px; }
+main section.active { display: block; }
+h2 { font: 600 13px/1.2 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 22px 0 10px; }
+h2:first-child { margin-top: 4px; }
+.meta { color: var(--muted); font-size: 13px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* count tiles */
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; display: grid; gap: 4px; position: relative; }
+.tile .k { font: 600 12px/1.2 var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.tile .v { font: 600 30px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.tile.up .v { color: var(--up); } .tile.down .v { color: var(--down); }
+.tile[aria-pressed="true"] { border-color: currentColor; box-shadow: inset 0 0 0 1px var(--ink); }
+.tile.up[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--up); border-color: var(--up); }
+.tile.down[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--down); border-color: var(--down); }
+
+/* segmented */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+/* stock list */
+.list { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.item { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 0 12px; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); cursor: pointer; align-items: center; }
+.item:first-child { border-top: 0; }
+.item .stripe { align-self: stretch; border-radius: 0 3px 3px 0; }
+.item.UP .stripe { background: var(--up); } .item.DOWN .stripe { background: var(--down); }
+.item.near .stripe { opacity: .35; }
+.sym { font: 600 15px/1.2 var(--mono); }
+.sub { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.right { text-align: right; }
+.price { font: 600 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.dist { font: 500 12px/1.3 var(--mono); font-variant-numeric: tabular-nums; margin-top: 3px; }
+.UP .dist { color: var(--up); } .DOWN .dist { color: var(--down); }
+.tag { font: 600 10.5px/1 var(--body); letter-spacing: .05em; text-transform: uppercase; padding: 3px 6px; border-radius: 5px; border: 1px solid currentColor; }
+.tag.brk.UP { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+.tag.brk.DOWN { color: var(--down); background: color-mix(in srgb, var(--down) 12%, transparent); }
+.tag.near { color: var(--muted); }
+.vol.hot { color: var(--warn); font-weight: 600; }
+.empty { padding: 18px 14px; color: var(--muted); font-size: 14px; }
+
+/* events */
+.feed { display: grid; gap: 0; border-left: 2px solid var(--line); margin-left: 6px; }
+.ev { padding: 6px 0 6px 14px; position: relative; font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; cursor: pointer; }
+.ev::before { content: ""; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); border: 2px solid var(--muted); }
+.ev.UP.BREAKOUT::before { border-color: var(--up); background: var(--up); }
+.ev.DOWN.BREAKOUT::before { border-color: var(--down); background: var(--down); }
+.ev.UP.NEAR::before { border-color: var(--up); } .ev.DOWN.NEAR::before { border-color: var(--down); }
+.ev .t { font-family: var(--mono); color: var(--muted); }
+
+/* breadth chart */
+.card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px; }
+.chart-box { position: relative; width: 100%; }
+canvas { display: block; width: 100%; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+
+/* stock detail */
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin-top: 12px; }
+.stat { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dotted var(--line); padding-bottom: 4px; font-size: 13px; }
+.stat span:first-child { color: var(--muted); }
+.stat span { white-space: nowrap; }
+@media (max-width: 440px) { .stats { grid-template-columns: minmax(0, 1fr); } }
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; }
+
+/* forms */
+label.f { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+label.f small { font-weight: 400; color: var(--muted); }
+input[type=text], input[type=password], input[type=number], input[type=search], textarea {
+  width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; font-size: 16px;
+}
+textarea { min-height: 76px; resize: vertical; font-family: var(--mono); font-size: 13px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stack { display: grid; gap: 12px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.wide { width: 100%; padding: 13px 14px; font-size: 16px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.steps { counter-reset: s; display: grid; gap: 14px; }
+.step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.step::before { counter-increment: s; content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 var(--mono); background: var(--sunk); color: var(--ink); }
+.step.done::before { content: "✓"; background: var(--up); color: var(--surface); }
+.hint { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+.ok { color: var(--up); font-weight: 600; } .bad { color: var(--down); font-weight: 600; }
+
+/* runs */
+.run { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.run:first-child { border-top: 0; }
+.run .n { font-weight: 600; font-size: 14px; }
+.pill { font: 600 11px/1 var(--body); padding: 4px 8px; border-radius: 999px; letter-spacing: .03em; text-transform: uppercase; align-self: center; }
+.pill.success { background: color-mix(in srgb, var(--up) 16%, transparent); color: var(--up); }
+.pill.failure, .pill.cancelled, .pill.timed_out { background: color-mix(in srgb, var(--down) 15%, transparent); color: var(--down); }
+.pill.running { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.run .why { grid-column: 1 / -1; font-size: 12.5px; color: var(--down); }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 10px; }
+
+/* nav */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); height: var(--nav-h); }
+nav.tabs button { border: 0; background: none; display: grid; place-items: center; gap: 2px; align-content: center; font: 600 11px/1 var(--body); color: var(--muted); cursor: pointer; letter-spacing: .02em; }
+nav.tabs svg { width: 22px; height: 22px; }
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px); background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 14px; z-index: 40; max-width: calc(100% - 32px); }
+@media (min-width: 560px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .icon-btn.spin svg { animation: none; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div>
+    <h1 class="brand">Turtle Desk<small id="sub">20 / 55-day breakouts · NSE</small></h1>
+  </div>
+  <div class="spacer"></div>
+  <span class="chip" id="mkt"><span class="dot"></span><span id="mktTxt">Market</span></span>
+  <button class="icon-btn" id="refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+</div></header>
+
+<main class="wrap">
+  <div id="banner"></div>
+
+  <!-- LIVE -->
+  <section id="tab-live" class="active" aria-label="Live watch">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div class="meta" id="liveMeta">Waiting for data</div>
+      <div class="seg" id="winSeg" role="group" aria-label="Window">
+        <button data-w="all" aria-pressed="true">Both</button><button data-w="55" aria-pressed="false">55d</button><button data-w="20" aria-pressed="false">20d</button>
+      </div>
+    </div>
+    <div class="tiles" id="liveTiles"></div>
+    <h2 id="liveListTitle">Stocks</h2>
+    <div class="list" id="liveList"></div>
+    <h2>Alerts today</h2>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <!-- DAY END -->
+  <section id="tab-day" aria-label="Day end">
+    <div class="meta" id="dayMeta">Waiting for data</div>
+    <h2>Breadth, last 30 sessions</h2>
+    <div class="card">
+      <div class="chart-box"><canvas id="breadth" height="170" aria-label="Daily count of 20-day upside and downside breakouts"></canvas></div>
+      <div class="legend"><span><i style="background:var(--up)"></i>20d new highs</span><span><i style="background:var(--down)"></i>20d new lows</span><span><i style="background:var(--ink);opacity:.6"></i>55d (darker part)</span></div>
+    </div>
+    <h2>Close vs levels</h2>
+    <div class="tiles" id="dayTiles"></div>
+    <h2 id="dayListTitle">Stocks</h2>
+    <div class="list" id="dayList"></div>
+  </section>
+
+  <!-- CHART -->
+  <section id="tab-chart" aria-label="Stock chart">
+    <form class="search" id="symForm">
+      <input type="search" id="symInput" list="symList" placeholder="Stock symbol, e.g. TATAMOTORS" autocapitalize="characters" autocomplete="off" spellcheck="false">
+      <datalist id="symList"></datalist>
+      <button class="btn primary" type="submit">Show</button>
+    </form>
+    <p class="hint" id="chartHint">Tap any stock in Live or Day end to open its chart.</p>
+    <div class="card" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <div><span class="sym" id="cSym" style="font-size:18px">–</span> <span class="meta" id="cLast"></span></div>
+        <div class="seg" id="rangeSeg" role="group" aria-label="Range"><button data-n="60" aria-pressed="false">3M</button><button data-n="120" aria-pressed="true">6M</button><button data-n="250" aria-pressed="false">1Y</button></div>
+      </div>
+      <div class="chart-box" style="margin-top:10px"><canvas id="pc" height="300" aria-label="Price chart with 20 and 55 day channels"></canvas></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>55d high / low</span><span><i style="background:var(--muted)"></i>20d high / low (dashed)</span><span><i style="background:var(--warn)"></i>Live price</span></div>
+      <div class="stats" id="cStats"></div>
+    </div>
+  </section>
+
+  <!-- RUN -->
+  <section id="tab-run" aria-label="Start a run">
+    <h2>Start a run</h2>
+    <div class="card stack">
+      <div class="steps">
+        <div class="step" id="st1"><div>
+          <a class="btn" id="kiteLogin" href="#" target="_blank" rel="noopener">Open Kite login ↗</a>
+          <p class="hint">Log in. You land on an “Example Domain” page. Copy that page’s full address.</p>
+        </div></div>
+        <div class="step" id="st2"><div class="stack" style="gap:6px">
+          <label class="f" for="redirect">Paste the address here</label>
+          <textarea id="redirect" placeholder="https://example.com/?action=login&amp;type=login&amp;status=success&amp;request_token=…" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>
+          <div class="hint" id="tokState">The token is single use and expires in a few minutes, so start right after pasting.</div>
+        </div></div>
+        <div class="step" id="st3"><div class="stack">
+          <div class="seg" id="modeSeg" role="group" aria-label="Run type">
+            <button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button>
+          </div>
+          <div class="grid2" id="liveOpts">
+            <label class="f" for="mins">Minutes to watch<input type="number" id="mins" min="5" max="120" value="75" inputmode="numeric"></label>
+            <label class="f" for="nearAtr">Near distance<input type="number" id="nearAtr" min="0.05" max="3" step="0.05" value="0.3" inputmode="decimal"><small>× 20-day ATR</small></label>
+          </div>
+          <p class="hint" id="modeHint"></p>
+          <button class="btn primary wide" id="startBtn" disabled>Start</button>
+        </div></div>
+      </div>
+    </div>
+
+    <h2>Recent runs</h2>
+    <div class="list" id="runs"><div class="empty">Connect GitHub below to see runs.</div></div>
+
+    <h2>Connection</h2>
+    <details class="card" id="setDetails">
+      <summary id="setSummary">GitHub and Kite settings</summary>
+      <form class="stack" id="setForm">
+        <label class="f" for="ghToken">GitHub token
+          <input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…">
+          <small>Fine-grained token for the Turtle-strategy repo only, with Actions: Read and write and Contents: Read. Saved only in this browser.</small></label>
+        <label class="f" for="repo">Repository<input type="text" id="repo" value="lazzypj/Turtle-strategy" autocapitalize="off" spellcheck="false"></label>
+        <label class="f" for="apiKey">Kite API key<input type="text" id="apiKey" autocapitalize="off" spellcheck="false" placeholder="your api_key (not the secret)"><small>Used only to build the login link.</small></label>
+        <div class="row"><button class="btn primary" type="submit">Save and connect</button><button class="btn" type="button" id="forget">Forget token</button></div>
+        <div class="hint" id="setState"></div>
+      </form>
+    </details>
+    <p class="hint">Data is read from your private repo with your token. Kite data is for your own use, so do not share this page with a token saved on someone else’s device.</p>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <button data-tab="live" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Live</button>
+  <button data-tab="day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Day end</button>
+  <button data-tab="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16"/><path d="M8 15v-4M12 15V7M16 15v-6"/></svg>Chart</button>
+  <button data-tab="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>Run</button>
+</div></nav>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (v, d = 2) => (v == null || isNaN(v)) ? "–" : Number(v).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = v => (v > 0 ? "+" : "") + v.toFixed(2) + "%";
+const store = {
+  get(k, d = "") { try { return localStorage.getItem("td_" + k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("td_" + k, v); } catch {} },
+  del(k) { try { localStorage.removeItem("td_" + k); } catch {} },
+};
+
+/* ---------- state ---------- */
+const S = {
+  token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
+  tab: store.get("tab", "live"), win: "all", liveFilter: null, dayFilter: null,
+  live: null, summary: [], signals: [], prices: null, pricesLoading: null,
+  chartSym: store.get("sym", ""), chartN: 120, mode: null, sample: false, lastErr: "",
+};
+
+/* ---------- IST clock ---------- */
+function ist(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
+  const mins = (+p.hour % 24) * 60 + +p.minute;
+  return { date: `${p.year}-${p.month}-${p.day}`, mins, wd: p.weekday, hm: `${p.hour % 24 < 10 ? "0" : ""}${+p.hour % 24}:${p.minute}` };
+}
+function market() {
+  const t = ist(), wk = t.wd === "Sat" || t.wd === "Sun";
+  if (wk) return { k: "closed", label: "Closed · weekend", t };
+  if (t.mins < 555) return { k: "pre", label: "Opens 09:15", t };
+  if (t.mins < 930) return { k: "open", label: "Open · " + t.hm, t };
+  return { k: "closed", label: "Closed", t };
+}
+function paintMarket() {
+  const m = market(), c = $("#mkt");
+  c.className = "chip " + m.k; $("#mktTxt").textContent = m.label;
+}
+
+/* ---------- GitHub API ---------- */
+async function gh(path, { method = "GET", body, raw = false } = {}) {
+  const res = await fetch("https://api.github.com" + path, {
+    method, cache: "no-store",
+    headers: {
+      Authorization: "Bearer " + S.token,
+      Accept: raw ? "application/vnd.github.raw+json" : "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 404) return null;
+  if (res.status === 401) throw new Error("GitHub rejected the token. Paste a new one under Run > Connection.");
+  if (res.status === 403) {
+    const t = await res.text();
+    throw new Error(/rate limit/i.test(t) ? "GitHub rate limit reached. Try again in a few minutes." : "The token is missing a permission. It needs Actions: Read and write and Contents: Read on this repo.");
+  }
+  if (!res.ok) throw new Error(`GitHub error ${res.status}.`);
+  if (res.status === 204) return true;
+  return raw ? res.text() : res.json();
+}
+const file = (path, ref = "main") => gh(`/repos/${S.repo}/contents/${path}?ref=${ref}`, { raw: true });
+
+/* ---------- CSV ---------- */
+function csv(text) {
+  if (!text) return [];
+  const lines = text.trim().split(/\r?\n/), head = lines.shift().split(",");
+  return lines.map(l => { const v = l.split(","), o = {}; head.forEach((h, i) => o[h] = v[i]); return o; });
+}
+
+/* ---------- sample data (shown until GitHub is connected) ---------- */
+function rng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function sampleSeries(sym) {
+  const r = rng([...sym].reduce((a, c) => a + c.charCodeAt(0) * 7, 11)); let p = 400 + r() * 2600; const out = [];
+  const d = new Date(Date.UTC(2026, 3, 1));
+  while (out.length < 300) {
+    d.setUTCDate(d.getUTCDate() + 1); if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
+    const drift = Math.sin(out.length / 37) * 0.004; const ch = (r() - 0.5) * 0.03 + drift; const o = p; p = Math.max(20, p * (1 + ch));
+    const hi = Math.max(o, p) * (1 + r() * 0.012), lo = Math.min(o, p) * (1 - r() * 0.012);
+    out.push({ date: d.toISOString().slice(0, 10), open: o, high: hi, low: lo, close: p, volume: Math.round(2e5 + r() * 2e6) });
+  }
+  return out;
+}
+const SAMPLE_SYMS = ["SAMPLE-ALPHA", "SAMPLE-BETA", "SAMPLE-GAMMA", "SAMPLE-DELTA", "SAMPLE-EPSILON", "SAMPLE-ZETA", "SAMPLE-ETA", "SAMPLE-THETA", "SAMPLE-IOTA", "SAMPLE-KAPPA", "SAMPLE-LAMBDA", "SAMPLE-MU"];
+function loadSample() {
+  S.sample = true;
+  S.prices = new Map(SAMPLE_SYMS.map(s => [s, sampleSeries(s)]));
+  const now = new Date(), t = ist(now);
+  const rows = [], events = [], sumRows = [], sig = [];
+  SAMPLE_SYMS.forEach((s, i) => {
+    const se = S.prices.get(s), ch = channels(se, se.length), side = i % 3 === 2 ? "DOWN" : "UP";
+    const lvl55 = side === "UP" ? ch.hi55 : ch.lo55, lvl20 = side === "UP" ? ch.hi20 : ch.lo20;
+    const k = [0.006, -0.002, 0.012, -0.004][i % 4];
+    const ltp = (side === "UP" ? lvl20 : lvl20) * (1 + (side === "UP" ? k : -k));
+    const st = (lvl, up) => up ? (ltp > lvl ? 2 : (lvl - ltp) <= 0.3 * ch.atr ? 1 : 0) : (ltp < lvl ? 2 : (ltp - lvl) <= 0.3 * ch.atr ? 1 : 0);
+    const s20 = st(lvl20, side === "UP"), s55 = st(lvl55, side === "UP");
+    if (!s20 && !s55) return;
+    const since = `09:${String(20 + i * 3).padStart(2, "0")}`;
+    rows.push({ symbol: s, side, ltp, vol_pct: Math.round(60 + i * 23), since, top: Math.max(s20, s55), s20, l20: lvl20, s55, l55: lvl55 });
+    events.push({ time: since, symbol: s, side, window: 20, status: s20 === 2 ? "BREAKOUT" : "NEAR", ltp, level: lvl20, vs_level_pct: (ltp / lvl20 - 1) * 100, vol_pct_of_avg: 60 + i * 23 });
+  });
+  events.sort((a, b) => b.time.localeCompare(a.time));
+  S.live = { sample: true, updated: now.toISOString(), date: t.date, poll: 42, stocks: 500, near_atr: 0.3, rows, events, watch_until: null };
+  for (let i = 30; i >= 1; i--) {
+    const r = rng(i * 97); const d = new Date(now); d.setDate(d.getDate() - i * 1.4);
+    sumRows.push({ date: d.toISOString().slice(0, 10), stocks_scanned: "500", long_20: String(Math.round(10 + r() * 60 + Math.sin(i / 4) * 20)), short_20: String(Math.round(8 + r() * 45 - Math.sin(i / 4) * 15)), long_55: String(Math.round(r() * 22)), short_55: String(Math.round(r() * 16)) });
+  }
+  S.summary = sumRows;
+  SAMPLE_SYMS.slice(0, 8).forEach((s, i) => {
+    const se = S.prices.get(s), ch = channels(se, se.length - 1), c = se.at(-1).close, up = i % 2 === 0;
+    sig.push({ date: se.at(-1).date, symbol: s, close: String(c), high_20: String(ch.hi20), low_20: String(ch.lo20), high_55: String(ch.hi55), low_55: String(ch.lo55), long_20: String(up), short_20: String(!up), long_55: String(up && i % 4 === 0), short_55: String(!up && i % 4 === 1), atr_20: String(ch.atr) });
+  });
+  S.signals = sig;
+}
+
+/* ---------- indicators ---------- */
+function channels(se, end) { // levels from the n days before index `end`
+  const w = (n, f, k) => { const a = se.slice(Math.max(0, end - n), end).map(x => x[k]); return a.length ? f(...a) : NaN; };
+  const tr = []; for (let i = Math.max(1, end - 20); i < end; i++) { const pc = se[i - 1].close; tr.push(Math.max(se[i].high - se[i].low, Math.abs(se[i].high - pc), Math.abs(se[i].low - pc))); }
+  return { hi20: w(20, Math.max, "high"), lo20: w(20, Math.min, "low"), hi55: w(55, Math.max, "high"), lo55: w(55, Math.min, "low"), atr: tr.length ? tr.reduce((a, b) => a + b, 0) / tr.length : NaN };
+}
+
+/* ---------- banner ---------- */
+function banner() {
+  const b = $("#banner");
+  if (S.lastErr) { b.innerHTML = `<div class="banner err"><b>Could not load</b><span>${esc(S.lastErr)}</span></div>`; return; }
+  if (S.sample) { b.innerHTML = `<div class="banner"><b>Sample data</b><span>These are made-up stocks. Connect GitHub in the Run tab to see your own scans.</span><button class="btn" data-go="run">Connect</button></div>`; return; }
+  b.innerHTML = "";
+}
+
+/* ---------- LIVE ---------- */
+function liveRows() {
+  const L = S.live; if (!L) return [];
+  return L.rows.map(r => {
+    const ws = S.win === "all" ? [55, 20] : [+S.win];
+    const top = Math.max(...ws.map(w => r["s" + w] || 0));
+    const w = ws.find(x => r["s" + x] === top) ?? ws[0];
+    return { ...r, vtop: top, vwin: w, vlvl: r["l" + w] };
+  }).filter(r => r.vtop > 0);
+}
+function renderLive() {
+  const L = S.live, rows = liveRows();
+  const cnt = k => rows.filter(r => r.side + r.vtop === k).length;
+  const tiles = [["UP2", "up", "▲ Breakout", "above high"], ["UP1", "up", "▲ Near", "approaching high"], ["DOWN2", "down", "▼ Breakdown", "below low"], ["DOWN1", "down", "▼ Near", "approaching low"]];
+  $("#liveTiles").innerHTML = tiles.map(([k, c, t, s]) => `<button class="tile ${c}" data-f="${k}" aria-pressed="${S.liveFilter === k}"><span class="k">${t}</span><span class="v">${L ? cnt(k) : "–"}</span><span class="s">${s}</span></button>`).join("");
+  if (!L) { $("#liveMeta").textContent = "No live run yet today. Start one from the Run tab."; $("#liveList").innerHTML = `<div class="empty">No live data.</div>`; $("#feed").innerHTML = ""; return; }
+
+  const upd = new Date(L.updated), ageMin = (Date.now() - upd) / 60000, today = ist().date;
+  const tUpd = ist(upd).hm;
+  let state;
+  if (L.sample) state = "Sample";
+  else if (L.date !== today) state = `Last run ${L.date}`;
+  else if (ageMin > 3) state = `Stopped · last update ${tUpd}`;
+  else state = `Live · updated ${tUpd}`;
+  $("#liveMeta").innerHTML = `<b>${esc(state)}</b> · ${L.stocks} stocks · near = ${L.near_atr} ATR`;
+
+  const sel = rows.filter(r => !S.liveFilter || r.side + r.vtop === S.liveFilter)
+    .sort((a, b) => (b.vtop - a.vtop) || b.since.localeCompare(a.since));
+  const names = { UP2: "Upside breakouts", UP1: "Near upside breakout", DOWN2: "Downside breakdowns", DOWN1: "Near downside breakdown" };
+  $("#liveListTitle").textContent = (S.liveFilter ? names[S.liveFilter] : "All flagged stocks") + ` (${sel.length})`;
+  $("#liveList").innerHTML = sel.length ? sel.map(r => {
+    const d = (r.ltp / r.vlvl - 1) * 100, brk = r.vtop === 2;
+    const other = S.win === "all" ? [55, 20].filter(w => w !== r.vwin && r["s" + w]).map(w => `<span class="tag ${r["s" + w] === 2 ? "brk " + r.side : "near"}">${w}d ${r["s" + w] === 2 ? "brk" : "near"}</span>`).join("") : "";
+    return `<div class="item ${r.side} ${brk ? "" : "near"}" data-sym="${esc(r.symbol)}" role="button" tabindex="0">
+      <span class="stripe"></span>
+      <div><div class="sym">${esc(r.symbol)}</div>
+        <div class="sub"><span class="tag ${brk ? "brk " + r.side : "near"}">${r.vwin}d ${brk ? (r.side === "UP" ? "breakout" : "breakdown") : "near"}</span>${other}<span class="vol ${r.vol_pct >= 150 ? "hot" : ""}">vol ${r.vol_pct}%</span><span>since ${esc(r.since)}</span></div></div>
+      <div class="right"><div class="price">${fmt(r.ltp)}</div><div class="dist">${pct(d)} vs ${fmt(r.vlvl)}</div></div>
+    </div>`;
+  }).join("") : `<div class="empty">${S.liveFilter ? "None in this group right now." : "No stock is near a level right now."}</div>`;
+
+  const ev = (L.events || []).filter(e => S.win === "all" || String(e.window) === S.win).slice(0, 40);
+  $("#feed").innerHTML = ev.length ? ev.map(e => `<div class="ev ${e.side} ${e.status}" data-sym="${esc(e.symbol)}"><span class="t">${esc(e.time)}</span><b class="num">${esc(e.symbol)}</b><span>${e.status === "BREAKOUT" ? (e.side === "UP" ? "broke the" : "broke below the") : "near the"} ${e.window}d ${e.side === "UP" ? "high" : "low"}</span><span class="num meta">${fmt(e.ltp)} · vol ${Math.round(e.vol_pct_of_avg)}%</span></div>`).join("") : `<div class="empty">No alerts yet.</div>`;
+}
+
+/* ---------- DAY END ---------- */
+function renderDay() {
+  const sum = S.summary, last = sum.at(-1), sig = S.signals;
+  if (!last) { $("#dayMeta").textContent = "No day-end scan yet. Run one after 15:30 from the Run tab."; $("#dayTiles").innerHTML = ""; $("#dayList").innerHTML = `<div class="empty">No data.</div>`; drawBreadth(); return; }
+  $("#dayMeta").innerHTML = `<b>Close of ${esc(last.date)}</b> · ${esc(last.stocks_scanned)} stocks scanned`;
+  const tiles = [["long_55", "up", "▲ 55d high"], ["long_20", "up", "▲ 20d high"], ["short_55", "down", "▼ 55d low"], ["short_20", "down", "▼ 20d low"]];
+  $("#dayTiles").innerHTML = tiles.map(([k, c, t]) => `<button class="tile ${c}" data-df="${k}" aria-pressed="${S.dayFilter === k}"><span class="k">${t}</span><span class="v">${esc(last[k])}</span><span class="s">${k.endsWith("55") ? "also counted in 20d" : "closes beyond level"}</span></button>`).join("");
+  const T = v => v === "True" || v === "true" || v === true;
+  const rows = sig.filter(r => r.date === last.date || S.sample).map(r => {
+    const up = T(r.long_20) || T(r.long_55), w = (up ? T(r.long_55) : T(r.short_55)) ? 55 : 20;
+    const lvl = +(up ? r["high_" + w] : r["low_" + w]);
+    return { ...r, up, w, lvl, c: +r.close, d: (+r.close / lvl - 1) * 100 };
+  }).filter(r => !S.dayFilter || T(r[S.dayFilter]));
+  rows.sort((a, b) => (b.up - a.up) || (b.w - a.w) || Math.abs(b.d) - Math.abs(a.d));
+  const names = { long_55: "Closed above the 55-day high", long_20: "Closed above the 20-day high", short_55: "Closed below the 55-day low", short_20: "Closed below the 20-day low" };
+  $("#dayListTitle").textContent = (S.dayFilter ? names[S.dayFilter] : "All breakouts at the close") + ` (${rows.length})`;
+  $("#dayList").innerHTML = rows.length ? rows.map(r => { const s = r.up ? "UP" : "DOWN"; return `<div class="item ${s}" data-sym="${esc(r.symbol)}" role="button" tabindex="0"><span class="stripe"></span>
+    <div><div class="sym">${esc(r.symbol)}</div><div class="sub"><span class="tag brk ${s}">${r.w}d ${r.up ? "high" : "low"}</span><span>ATR ${fmt(+r.atr_20)}</span></div></div>
+    <div class="right"><div class="price">${fmt(r.c)}</div><div class="dist">${pct(r.d)} vs ${fmt(r.lvl)}</div></div></div>`; }).join("") : `<div class="empty">None.</div>`;
+  drawBreadth();
+}
+
+/* ---------- canvas helpers ---------- */
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function prep(cv) {
+  const dpr = Math.min(3, window.devicePixelRatio || 1), w = cv.clientWidth, h = +cv.getAttribute("height");
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + "px";
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  g.font = `11px ${css("--mono")}`; return { g, w, h };
+}
+function drawBreadth() {
+  const cv = $("#breadth"); if (!cv.clientWidth) return;
+  const { g, w, h } = prep(cv), data = S.summary.slice(-30);
+  const muted = css("--muted"), line = css("--line"), up = css("--up"), dn = css("--down"), ink = css("--ink");
+  if (!data.length) { g.fillStyle = muted; g.fillText("No day-end scans yet", 8, h / 2); return; }
+  const max = Math.max(5, ...data.map(d => Math.max(+d.long_20, +d.short_20)));
+  const step = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / step) * step;
+  const L = 34, R = 6, T = 8, B = 20, mid = T + (h - T - B) / 2, sc = (h - T - B) / 2 / top;
+  g.strokeStyle = line; g.lineWidth = 1; g.fillStyle = muted; g.textAlign = "right"; g.textBaseline = "middle";
+  [top, top / 2, 0, -top / 2, -top].forEach(v => { const y = mid - v * sc; g.beginPath(); g.moveTo(L, y + .5); g.lineTo(w - R, y + .5); g.stroke(); g.fillText(String(Math.abs(v)), L - 6, y); });
+  const bw = (w - L - R) / data.length, gap = Math.max(1, bw * 0.25);
+  data.forEach((d, i) => {
+    const x = L + i * bw + gap / 2, bwi = bw - gap;
+    g.fillStyle = up; g.fillRect(x, mid - d.long_20 * sc, bwi, d.long_20 * sc);
+    g.fillStyle = dn; g.fillRect(x, mid, bwi, d.short_20 * sc);
+    g.globalAlpha = .55; g.fillStyle = ink; g.fillRect(x, mid - d.long_55 * sc, bwi, d.long_55 * sc); g.fillRect(x, mid, bwi, d.short_55 * sc); g.globalAlpha = 1;
+  });
+  g.fillStyle = muted; g.textBaseline = "alphabetic"; g.textAlign = "left"; g.fillText(data[0].date.slice(5), L, h - 4);
+  g.textAlign = "right"; g.fillText(data.at(-1).date.slice(5), w - R, h - 4);
+}
+
+/* ---------- CHART ---------- */
+async function ensurePrices() {
+  if (S.prices) return S.prices;
+  if (!S.token) { loadSample(); return S.prices; }
+  if (!S.pricesLoading) S.pricesLoading = (async () => {
+    $("#chartHint").textContent = "Loading price history…";
+    const t = await file("data/prices.csv");
+    if (!t) throw new Error("No price history in the repo yet. Run a scan first.");
+    const m = new Map(); const lines = t.split("\n"); lines.shift();
+    for (const l of lines) { if (!l) continue; const v = l.split(","); let a = m.get(v[1]); if (!a) m.set(v[1], a = []); a.push({ date: v[0], open: +v[2], high: +v[3], low: +v[4], close: +v[5], volume: +v[6] }); }
+    m.forEach(a => a.sort((x, y) => x.date < y.date ? -1 : 1));
+    S.prices = m; return m;
+  })().finally(() => { S.pricesLoading = null; });
+  return S.pricesLoading;
+}
+async function openChart(sym) {
+  if (sym) { S.chartSym = sym.toUpperCase().trim(); store.set("sym", S.chartSym); }
+  if (S.tab !== "chart") go("chart", true);
+  try {
+    const m = await ensurePrices();
+    $("#symList").innerHTML = [...m.keys()].sort().map(s => `<option value="${esc(s)}">`).join("");
+    if (!S.chartSym || !m.has(S.chartSym)) {
+      if (S.chartSym) $("#chartHint").innerHTML = `<span class="bad">${esc(S.chartSym)} is not in the stored history.</span> Pick a symbol from the list.`;
+      S.chartSym = S.chartSym && m.has(S.chartSym) ? S.chartSym : [...m.keys()][0];
+    } else $("#chartHint").textContent = "Tap any stock in Live or Day end to open its chart.";
+    $("#symInput").value = S.chartSym; drawChart();
+  } catch (e) { $("#chartHint").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+function drawChart() {
+  const se = S.prices?.get(S.chartSym); const cv = $("#pc"); if (!se || !cv.clientWidth) return;
+  const { g, w, h } = prep(cv);
+  const n = Math.min(S.chartN, se.length), start = se.length - n, view = se.slice(start);
+  const ch = view.map((_, i) => channels(se, start + i)), now = channels(se, se.length);
+  const liveRow = S.live?.rows?.find(r => r.symbol === S.chartSym && S.live.date === ist().date);
+  const ltp = liveRow?.ltp;
+  const vals = view.flatMap(d => [d.high, d.low]).concat(ch.flatMap(c => [c.hi55, c.lo55]).filter(isFinite)).concat(ltp ? [ltp] : []).concat([now.hi55, now.lo55].filter(isFinite));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+  const L = 6, R = 58, T = 8, B = 20, extra = 6, cw = (w - L - R) / (n + extra);
+  const y = v => T + (hi - v) / (hi - lo) * (h - T - B), x = i => L + (i + 0.5) * cw;
+  const muted = css("--muted"), line = css("--line"), acc = css("--accent"), up = css("--up"), dn = css("--down"), warn = css("--warn");
+  // grid
+  const rough = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(rough))), stp = [1, 2, 2.5, 5, 10].map(k => k * mag).find(k => k >= rough);
+  g.strokeStyle = line; g.lineWidth = 1; g.fillStyle = muted; g.textAlign = "left"; g.textBaseline = "middle";
+  for (let v = Math.ceil(lo / stp) * stp; v <= hi; v += stp) { const yy = Math.round(y(v)) + .5; g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.fillText(fmt(v, v >= 1000 ? 0 : 1), w - R + 6, yy); }
+  // 55d band
+  g.fillStyle = acc; g.globalAlpha = .08; g.beginPath();
+  ch.forEach((c, i) => { if (isFinite(c.hi55)) g.lineTo(x(i), y(c.hi55)); });
+  for (let i = ch.length - 1; i >= 0; i--) if (isFinite(ch[i].lo55)) g.lineTo(x(i), y(ch[i].lo55));
+  g.closePath(); g.fill(); g.globalAlpha = 1;
+  const path = (key, color, dash, width) => { g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash); g.beginPath(); let s = false; ch.forEach((c, i) => { if (!isFinite(c[key])) return; const px = x(i), py = y(c[key]); s ? g.lineTo(px, py) : g.moveTo(px, py); s = true; }); g.stroke(); g.setLineDash([]); };
+  path("hi55", acc, [], 1.5); path("lo55", acc, [], 1.5); path("hi20", muted, [4, 3], 1); path("lo20", muted, [4, 3], 1);
+  // bars
+  const bw = Math.max(1, Math.min(6, cw * 0.6));
+  view.forEach((d, i) => {
+    const pc = i ? view[i - 1].close : se[start - 1]?.close ?? d.open; g.strokeStyle = d.close >= pc ? up : dn; g.lineWidth = Math.max(1, bw / 3);
+    g.beginPath(); g.moveTo(x(i), y(d.high)); g.lineTo(x(i), y(d.low)); g.stroke();
+    g.beginPath(); g.moveTo(x(i), y(d.close)); g.lineTo(x(i) + bw / 2 + 1, y(d.close)); g.stroke();
+  });
+  // today's levels extended
+  const xr = x(n - 1) + cw, xe = w - R;
+  [[now.hi55, acc, []], [now.lo55, acc, []], [now.hi20, muted, [4, 3]], [now.lo20, muted, [4, 3]]].forEach(([v, c, d]) => { if (!isFinite(v)) return; g.strokeStyle = c; g.setLineDash(d); g.lineWidth = 1.5; g.beginPath(); g.moveTo(xr, y(v)); g.lineTo(xe, y(v)); g.stroke(); g.setLineDash([]); });
+  if (ltp) { const yy = y(ltp); g.fillStyle = warn; g.beginPath(); g.arc(x(n - 1) + cw * 3, yy, 4, 0, Math.PI * 2); g.fill(); g.fillRect(w - R + 2, yy - 8, R - 2, 16); g.fillStyle = css("--surface"); g.fillText(fmt(ltp, ltp >= 1000 ? 0 : 1), w - R + 6, yy); }
+  g.fillStyle = muted; g.textBaseline = "alphabetic"; g.textAlign = "left"; g.fillText(view[0].date, L, h - 4); g.textAlign = "right"; g.fillText(view.at(-1).date, w - R, h - 4);
+
+  const last = se.at(-1), ref = ltp ?? last.close;
+  $("#cSym").textContent = S.chartSym;
+  $("#cLast").textContent = ltp ? `live ${fmt(ltp)} · close ${last.date} ${fmt(last.close)}` : `close ${last.date} ${fmt(last.close)}`;
+  const st = (label, v) => `<div class="stat"><span>${label}</span><span class="num">${fmt(v)} <span class="meta">${isFinite(v) ? pct((ref / v - 1) * 100) : ""}</span></span></div>`;
+  $("#cStats").innerHTML = st("55d high", now.hi55) + st("20d high", now.hi20) + st("55d low", now.lo55) + st("20d low", now.lo20) +
+    `<div class="stat"><span>ATR 20</span><span class="num">${fmt(now.atr)}</span></div><div class="stat"><span>Near zone</span><span class="num">${fmt(now.atr * (S.live?.near_atr ?? 0.3))}</span></div>`;
+}
+
+/* ---------- RUN ---------- */
+function token() {
+  const raw = $("#redirect").value.trim(); if (!raw) return "";
+  const m = raw.match(/request_token=([A-Za-z0-9]+)/); if (m) return m[1];
+  return /^[A-Za-z0-9]{10,}$/.test(raw) ? raw : "";
+}
+function autoMode() {
+  const m = market();
+  return m.k === "closed" ? "daily" : "intraday";
+}
+function paintRun() {
+  const t = token(), m = market(), mode = S.mode || autoMode();
+  $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
+  $("#liveOpts").hidden = mode !== "intraday";
+  const left = 930 - m.t.mins;
+  if (mode === "intraday") $("#modeHint").textContent = m.k === "closed" ? "The market is closed, so a live watch would stop straight away. Use the day-end scan." :
+    m.k === "pre" ? "It will wait for 09:16 and then watch. Free GitHub minutes cover about 75 minutes a trading day." : `About ${left} minutes of trading left today.`;
+  else $("#modeHint").textContent = m.k === "open" ? "Today’s candle is still forming, so the scan will use yesterday’s close. Best run after 15:35." : "Updates the price history and the day-end breakout list.";
+  const ready = !!t && !!S.token;
+  $("#startBtn").disabled = !ready;
+  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : "Run day-end scan";
+  $("#tokState").innerHTML = t ? `<span class="ok">Token found (…${esc(t.slice(-4))}).</span> Start now, it expires in a few minutes.` : $("#redirect").value.trim() ? `<span class="bad">No request_token in this text.</span> Copy the full address of the Example Domain page.` : "The token is single use and expires in a few minutes, so start right after pasting.";
+  $("#st2").classList.toggle("done", !!t);
+  const k = $("#kiteLogin");
+  if (S.apiKey) { k.href = "https://kite.zerodha.com/connect/login?v=3&api_key=" + encodeURIComponent(S.apiKey); k.removeAttribute("aria-disabled"); k.textContent = "Open Kite login ↗"; }
+  else { k.href = "#run"; k.setAttribute("aria-disabled", "true"); k.textContent = "Add your Kite API key below first"; }
+  $("#setSummary").textContent = S.token ? `Connected to ${S.repo}` : "GitHub and Kite settings";
+}
+async function startRun() {
+  const t = token(), mode = S.mode || autoMode(); if (!t) return;
+  const btn = $("#startBtn"); btn.disabled = true; btn.textContent = "Starting…";
+  const wf = mode === "intraday" ? "intraday.yml" : "daily.yml";
+  const inputs = { request_token: t };
+  if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); }
+  try {
+    await gh(`/repos/${S.repo}/actions/workflows/${wf}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
+    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Data appears in about 2 minutes." : "Day-end scan started.");
+    pollRuns(12);
+  } catch (e) { toast(e.message, 6000); }
+  paintRun();
+}
+let runTimer = null;
+function pollRuns(times) { clearInterval(runTimer); let k = 0; loadRuns(); runTimer = setInterval(() => { loadRuns(); if (++k >= times) clearInterval(runTimer); }, 10000); }
+async function loadRuns() {
+  if (!S.token) return;
+  try {
+    const r = await gh(`/repos/${S.repo}/actions/runs?per_page=6`);
+    const runs = r?.workflow_runs || [];
+    const html = await Promise.all(runs.map(async run => {
+      const st = run.status !== "completed" ? "running" : run.conclusion;
+      let why = "";
+      if (st === "failure") {
+        try { const j = await gh(`/repos/${S.repo}/actions/runs/${run.id}/jobs`); const step = j?.jobs?.flatMap(x => x.steps || []).find(s => s.conclusion === "failure"); if (step) why = `Failed at “${step.name}”. ` + hintFor(step.name); } catch {}
+      }
+      const when = ist(new Date(run.created_at));
+      return `<div class="run"><div><div class="n">${esc(run.name)}</div><div class="meta">${when.date} ${when.hm} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">open log ↗</a></div></div><span class="pill ${esc(st)}">${st === "running" ? (run.status === "queued" ? "queued" : "running") : esc(st)}</span>${why ? `<div class="why">${esc(why)}</div>` : ""}</div>`;
+    }));
+    $("#runs").innerHTML = html.join("") || `<div class="empty">No runs yet.</div>`;
+    if (runs.some(x => x.status !== "completed")) setTimeout(refresh, 1000);
+  } catch (e) { $("#runs").innerHTML = `<div class="empty bad">${esc(e.message)}</div>`; }
+}
+function hintFor(step) {
+  if (/Fetch|Watch/.test(step)) return "Usually an expired or incomplete Kite token. Log in again and start within a minute. Open the log for the exact message.";
+  if (/Commit/.test(step)) return "The data could not be saved to the repo. Open the log.";
+  return "Open the log for details.";
+}
+
+/* ---------- loading ---------- */
+let busy = false;
+async function refresh() {
+  if (busy) return; busy = true; $("#refresh").classList.add("spin");
+  try {
+    if (!S.token) { loadSample(); S.lastErr = ""; }
+    else {
+      S.sample = false;
+      const [lv, sm, sg] = await Promise.all([file("LIVE.json", "live").catch(e => { throw e; }), file("data/summary.csv"), file("data/signals_latest.csv")]);
+      try { S.live = lv ? JSON.parse(lv) : null; } catch { S.live = null; }
+      S.summary = csv(sm); S.signals = csv(sg); S.lastErr = "";
+      if (S.prices && S.prices.has("SAMPLE-ALPHA")) S.prices = null;
+    }
+  } catch (e) { S.lastErr = e.message; }
+  busy = false; $("#refresh").classList.remove("spin");
+  banner(); renderLive(); renderDay(); paintMarket(); paintRun();
+  if (S.tab === "chart") drawChart();
+}
+
+/* ---------- nav ---------- */
+function go(tab, fromChart = false) {
+  S.tab = tab; store.set("tab", tab);
+  $$("main section").forEach(s => s.classList.toggle("active", s.id === "tab-" + tab));
+  $$("nav.tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  if (tab === "day") requestAnimationFrame(drawBreadth);
+  if (tab === "chart" && !fromChart) openChart();
+  if (tab === "chart") requestAnimationFrame(drawChart);
+  if (tab === "run") loadRuns();
+  window.scrollTo(0, 0);
+}
+function toast(msg, ms = 3500) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), ms); }
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const tabBtn = e.target.closest("nav.tabs button"); if (tabBtn) return go(tabBtn.dataset.tab);
+  const goBtn = e.target.closest("[data-go]"); if (goBtn) { go(goBtn.dataset.go); $("#setDetails").open = true; return; }
+  const sym = e.target.closest("[data-sym]"); if (sym) return openChart(sym.dataset.sym);
+  const lt = e.target.closest("[data-f]"); if (lt) { S.liveFilter = S.liveFilter === lt.dataset.f ? null : lt.dataset.f; return renderLive(); }
+  const dt = e.target.closest("[data-df]"); if (dt) { S.dayFilter = S.dayFilter === dt.dataset.df ? null : dt.dataset.df; return renderDay(); }
+  const wb = e.target.closest("#winSeg button"); if (wb) { S.win = wb.dataset.w; $$("#winSeg button").forEach(b => b.setAttribute("aria-pressed", b === wb)); return renderLive(); }
+  const rb = e.target.closest("#rangeSeg button"); if (rb) { S.chartN = +rb.dataset.n; $$("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", b === rb)); return drawChart(); }
+  const mb = e.target.closest("#modeSeg button"); if (mb) { S.mode = mb.dataset.m; return paintRun(); }
+  if (e.target.closest("#kiteLogin[aria-disabled]")) { e.preventDefault(); $("#setDetails").open = true; $("#apiKey").focus(); }
+});
+document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-sym][role=button]")) { e.preventDefault(); openChart(e.target.dataset.sym); } });
+$("#refresh").addEventListener("click", () => { refresh(); if (S.tab === "run") loadRuns(); });
+$("#redirect").addEventListener("input", paintRun);
+$("#startBtn").addEventListener("click", startRun);
+$("#symForm").addEventListener("submit", e => { e.preventDefault(); openChart($("#symInput").value); });
+$("#setForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const tk = $("#ghToken").value.trim(), repo = $("#repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, ""), key = $("#apiKey").value.trim();
+  if (tk) { S.token = tk; store.set("token", tk); }
+  if (repo) { S.repo = repo; store.set("repo", repo); }
+  S.apiKey = key; store.set("apiKey", key);
+  $("#ghToken").value = ""; $("#setState").textContent = "Checking…";
+  if (!S.token) { $("#setState").textContent = "Saved. Add a GitHub token to load your data."; paintRun(); return; }
+  try {
+    const r = await gh(`/repos/${S.repo}`);
+    if (!r) throw new Error(`Repository ${S.repo} not found, or the token has no access to it.`);
+    $("#setState").innerHTML = `<span class="ok">Connected to ${esc(r.full_name)}.</span>`;
+    S.prices = null; await refresh(); loadRuns();
+  } catch (err) { $("#setState").innerHTML = `<span class="bad">${esc(err.message)}</span>`; }
+  paintRun();
+});
+$("#forget").addEventListener("click", () => { S.token = ""; store.del("token"); S.prices = null; $("#setState").textContent = "Token removed from this browser."; refresh(); });
+let rT; window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { drawBreadth(); drawChart(); }, 150); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
+
+/* ---------- boot ---------- */
+$("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
+const mLeft = 930 - market().t.mins; if (market().k !== "closed") $("#mins").value = Math.max(5, Math.min(75, market().k === "pre" ? 75 : mLeft));
+go(["live", "day", "chart", "run"].includes(S.tab) ? S.tab : "live");
+refresh();
+setInterval(() => { paintMarket(); if (document.visibilityState === "visible" && S.token && (S.tab === "live" || S.tab === "chart") && market().k !== "closed") refresh(); }, 30000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) refresh(); });
+})();
+</script>
+</body>
+</html>
