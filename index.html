@@ -18,14 +18,15 @@
   --bar: rgba(242, 243, 245, .82);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --tab-h: 56px;
+  --ma1: #7C3AED; --ma2: #0284C7; --ma3: #DB2777; --ma4: #0D9488; --ma5: #B45309;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0B0C0E; --card: #17191D; --fill: #23262B; --ink: #F3F5F8; --ink2: #A3ABB6; --ink3: #6F7782; --sep: #272A30;
-  --accent: #5B8DEF; --on-accent: #FFFFFF; --up: #2FC27A; --down: #FF6369; --amber: #F2A93B; --bar: rgba(11, 12, 14, .8); color-scheme: dark; } }
+  --accent: #5B8DEF; --on-accent: #FFFFFF; --up: #2FC27A; --down: #FF6369; --amber: #F2A93B; --bar: rgba(11, 12, 14, .8); --ma1: #A78BFA; --ma2: #38BDF8; --ma3: #F472B6; --ma4: #2DD4BF; --ma5: #FBBF24; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0B0C0E; --card: #17191D; --fill: #23262B; --ink: #F3F5F8; --ink2: #A3ABB6; --ink3: #6F7782; --sep: #272A30;
-  --accent: #5B8DEF; --on-accent: #FFFFFF; --up: #2FC27A; --down: #FF6369; --amber: #F2A93B; --bar: rgba(11, 12, 14, .8); color-scheme: dark; }
+  --accent: #5B8DEF; --on-accent: #FFFFFF; --up: #2FC27A; --down: #FF6369; --amber: #F2A93B; --bar: rgba(11, 12, 14, .8); --ma1: #A78BFA; --ma2: #38BDF8; --ma3: #F472B6; --ma4: #2DD4BF; --ma5: #FBBF24; color-scheme: dark; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
@@ -137,6 +138,16 @@ canvas { display: block; touch-action: pan-y; }
 .search input { border: 0; background: none; padding: 9px 0; font-size: 16px; flex: 1; min-width: 0; outline: none; text-transform: uppercase; }
 .search input::placeholder { text-transform: none; color: var(--ink3); }
 
+/* chart controls */
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 12px -14px 0; padding: 0 14px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { border: 0; background: var(--fill); border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 600; color: var(--ink2); white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; flex: none; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; opacity: .45; }
+.chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--card)); color: var(--ink); }
+.chip[aria-pressed="true"] i { opacity: 1; }
+.crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.readout { white-space: normal; min-height: 36px; line-height: 1.45; }
+
 /* option chain */
 .ocsum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 12px 6px 10px; border-bottom: .5px solid var(--sep); }
 .ocsum div { display: grid; justify-items: center; gap: 1px; min-width: 0; }
@@ -241,11 +252,12 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <div class="card" style="margin-top:12px">
       <div class="qhead">
         <div><div class="sym" style="font-size:17px"><em id="cSym">–</em></div><div class="big" id="cPx">–</div><div class="cap" id="cSub"></div></div>
-        <div class="seg" id="rangeSeg" role="group" aria-label="Range" style="width:150px"><button data-n="60" aria-pressed="false">3M</button><button data-n="120" aria-pressed="true">6M</button><button data-n="250" aria-pressed="false">1Y</button></div>
+        <div class="seg" id="ivSeg" role="group" aria-label="Interval" style="width:184px"><button data-iv="1m">1m</button><button data-iv="5m">5m</button><button data-iv="15m">15m</button><button data-iv="1D">1D</button></div>
       </div>
-      <div class="readout" id="readout">Drag across the chart to read a day</div>
-      <div class="cbox" id="pcBox"><canvas id="pc" aria-label="Price with 20 and 55 day channels"></canvas></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>55D high / low</span><span><i class="dash"></i>20D high / low</span><span><i style="background:var(--amber)"></i>Live</span></div>
+      <div class="chips" id="maChips"></div>
+      <div class="readout" id="readout"></div>
+      <div class="cbox" id="pcBox"><canvas id="pc" aria-label="Candlestick chart"></canvas></div>
+      <div class="crow"><div class="legend" id="cLegend" style="margin:0"></div><div class="seg" id="rangeRow" role="group" aria-label="Range" style="width:132px"><span id="rangeSeg" style="display:contents"><button data-n="60">3M</button><button data-n="120">6M</button><button data-n="250">1Y</button></span></div></div>
     </div>
     <div class="gh">Levels for the next session</div>
     <div class="list" id="cLevels"></div>
@@ -324,7 +336,7 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
-  sym: store.get("sym", ""), n: 120, mode: null, sample: false, err: "", hover: null, geo: null,
+  sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
 };
 
 /* ---------- time ---------- */
@@ -549,54 +561,173 @@ async function openChart(sym) {
     if ($("#symList").childElementCount !== m.size) $("#symList").innerHTML = [...m.keys()].sort().map(s => `<option value="${esc(s)}">`).join("");
     if (!m.has(S.sym)) { if (S.sym) $("#chartMsg").innerHTML = `<span class="bad">${esc(S.sym)} is not in the stored history.</span>`; S.sym = [...m.keys()].sort()[0]; }
     else $("#chartMsg").textContent = "";
-    $("#symInput").value = ""; $("#symInput").placeholder = "Search stock · showing " + S.sym; drawChart(); showOC();
+    $("#symInput").value = ""; $("#symInput").placeholder = "Search stock · showing " + S.sym;
+    paintChartControls(); drawChart(); showOC();
+    const sym0 = S.sym; await ensureBars(sym0); if (S.sym === sym0) drawChart();
   } catch (e) { $("#chartMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
 }
+
+/* intraday candles */
+function sampleBars(sym) {
+  const se = S.prices?.get(sym); if (!se) return null; const r = rng([...sym].reduce((a, c) => a + c.charCodeAt(0), 5)); const days = {};
+  se.slice(-5).forEach(d => { let p = d.open; const a = [];
+    for (let m = 555; m < 930; m++) { const o = p, tgt = d.close, left = 930 - m; p = o + (tgt - o) / left + (r() - .5) * d.open * .002; a.push([m, +o.toFixed(2), +(Math.max(o, p) + r() * d.open * .0008).toFixed(2), +(Math.min(o, p) - r() * d.open * .0008).toFixed(2), +p.toFixed(2), Math.round(2000 + r() * 8000 * (m < 600 || m > 900 ? 3 : 1))]); }
+    days[d.date] = a; });
+  return { symbol: sym, sample: true, days };
+}
+async function ensureBars(sym) {
+  const c = S.bars[sym]; if (c && Date.now() - c.at < 60000) return c.data;
+  if (!S.token) { S.bars[sym] = { data: sampleBars(sym), at: Date.now() }; return S.bars[sym].data; }
+  let d = null;
+  try { const t = await file(`bars/${encodeURIComponent(sym)}.json`, "bars"); d = t ? JSON.parse(t) : null; S.barsErr = ""; }
+  catch (e) { S.barsErr = e.message; }
+  S.bars[sym] = { data: d, at: Date.now() }; return d;
+}
+const hhmm = m => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+function intradaySeries(step) {
+  const b = S.bars[S.sym]?.data; if (!b?.days) return null; const out = [];
+  for (const day of Object.keys(b.days).sort()) { let cur = null;
+    for (const r of b.days[day]) { const bk = Math.floor((r[0] - 555) / step);
+      if (!cur || cur.bk !== bk) { if (cur) out.push(cur); cur = { d: day, m: 555 + bk * step, bk, o: r[1], h: r[2], l: r[3], c: r[4], v: r[5] }; }
+      else { cur.h = Math.max(cur.h, r[2]); cur.l = Math.min(cur.l, r[3]); cur.c = r[4]; cur.v += r[5]; } }
+    if (cur) out.push(cur); }
+  return out;
+}
+function liveRow() { return S.live?.date === ist().date ? S.live.rows.find(r => r.symbol === S.sym) : null; }
+function dailySeries(se, lr) {
+  const out = se.map(d => ({ d: d.date, m: null, o: d.open, h: d.high, l: d.low, c: d.close, v: d.volume }));
+  const b = S.bars[S.sym]?.data;
+  if (b?.days && !b.sample) { const last = Object.keys(b.days).sort().at(-1), a = b.days[last];
+    if (last > se.at(-1).date && a?.length) { const lt = lr?.ltp;
+      out.push({ d: last, m: null, o: a[0][1], h: Math.max(...a.map(r => r[2]), lt ?? -Infinity), l: Math.min(...a.map(r => r[3]), lt ?? Infinity), c: lt ?? a.at(-1)[4], v: a.reduce((s, r) => s + r[5], 0), prov: true }); } }
+  return out;
+}
+function sma(c, n) { const o = new Array(c.length).fill(NaN); let s = 0; for (let i = 0; i < c.length; i++) { s += c[i]; if (i >= n) s -= c[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+function ema(c, n) { const o = new Array(c.length).fill(NaN); if (c.length < n) return o; let e = c.slice(0, n).reduce((a, b) => a + b, 0) / n; o[n - 1] = e; const k = 2 / (n + 1); for (let i = n; i < c.length; i++) { e = c[i] * k + e * (1 - k); o[i] = e; } return o; }
+const MA_DEF = [["MA20", "sma", 20, "--ma1"], ["MA50", "sma", 50, "--ma2"], ["MA200", "sma", 200, "--ma3"], ["EMA9", "ema", 9, "--ma4"], ["EMA21", "ema", 21, "--ma5"]];
+const VIEW_N = { "1m": 150, "5m": 150, "15m": 130 };
+
+function paintChartControls() {
+  $$("#ivSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.iv === S.iv));
+  $$("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.n === S.n));
+  $("#rangeRow").hidden = S.iv !== "1D";
+  $("#maChips").innerHTML = MA_DEF.map(([k, , , col]) => `<button class="chip" data-ma="${k}" aria-pressed="${S.mas.includes(k)}"><i style="background:var(${col})"></i>${k}</button>`).join("") +
+    `<button class="chip" data-opt="turtle" aria-pressed="${S.turtle}"><i style="background:var(--accent)"></i>20/55D</button><button class="chip" data-opt="vol" aria-pressed="${S.vol}"><i style="background:var(--ink3)"></i>Volume</button>`;
+}
+
 function drawChart() {
   const se = S.prices?.get(S.sym); if (!se) return;
+  const lr = liveRow(), ltp = lr?.ltp;
+  headerAndLevels(se, lr);
   const c = sizeCanvas($("#pc"), $("#pcBox"), CHART_H); if (!c) return;
-  const { g, w, h } = c;
-  const n = Math.min(S.n, se.length), start = se.length - n, view = se.slice(start), ch = view.map((_, i) => channels(se, start + i)), nx = channels(se, se.length);
-  const lr = S.live?.date === ist().date ? S.live.rows.find(r => r.symbol === S.sym) : null, ltp = lr?.ltp;
-  const vals = view.flatMap(d => [d.high, d.low]).concat(ch.flatMap(c => [c.hi55, c.lo55]), [nx.hi55, nx.lo55], ltp ? [ltp] : []).filter(isFinite);
-  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * .05; lo -= pad; hi += pad;
-  const L = 2, R = 50, Tp = 6, B = 18, extra = Math.max(4, Math.round(n * .04)), cw = (w - L - R) / (n + extra);
-  const y = v => Tp + (hi - v) / (hi - lo) * (h - Tp - B), x = i => L + (i + .5) * cw;
-  const ink3 = tok("--ink3"), sep = tok("--sep"), acc = tok("--accent"), up = tok("--up"), dn = tok("--down"), amb = tok("--amber");
+  const { g, w, h } = c, daily = S.iv === "1D", step = { "1m": 1, "5m": 5, "15m": 15 }[S.iv];
+  const series = daily ? dailySeries(se, lr) : intradaySeries(step);
+  const ink2 = tok("--ink2"), ink3 = tok("--ink3"), sep = tok("--sep"), acc = tok("--accent"), up = tok("--up"), dn = tok("--down"), amb = tok("--amber");
+  if (!series?.length) {
+    S.geo = null; g.fillStyle = ink2; g.textAlign = "center"; g.font = `500 13px ${tok("--font")}`;
+    const loading = !S.bars[S.sym];
+    g.fillText(loading ? "Loading candles…" : S.barsErr ? "Could not load candles" : "No intraday candles for this stock yet", w / 2, h / 2 - 8);
+    g.font = `400 12px ${tok("--font")}`; g.fillStyle = ink3;
+    if (!loading) g.fillText(S.barsErr || "Saved by the day-end scan, and every 5 min for flagged stocks during a live watch.", w / 2, h / 2 + 12);
+    $("#readout").textContent = ""; legend([]); return;
+  }
+  const n = Math.min(daily ? S.n : VIEW_N[S.iv], series.length), start = series.length - n, view = series.slice(start);
+  const closes = series.map(x => x.c);
+  const mas = MA_DEF.filter(m => S.mas.includes(m[0])).map(([name, kind, len, col]) => ({ name, col: tok(col), vals: (kind === "sma" ? sma : ema)(closes, len).slice(start) }));
+  let ch = null, lv = [];
+  if (S.turtle) {
+    if (daily) { const dse = series.map(x => ({ high: x.h, low: x.l, close: x.c })); ch = view.map((_, i) => channels(dse, start + i)); }
+    else { const lastDay = view.at(-1).d; let idx = se.findIndex(x => x.date >= lastDay); if (idx < 0) idx = se.length; const L0 = channels(se, idx);
+      lv = [["55D high", L0.hi55, acc, []], ["20D high", L0.hi20, ink3, [3, 3]], ["20D low", L0.lo20, ink3, [3, 3]], ["55D low", L0.lo55, acc, []]].filter(x => isFinite(x[1])); }
+  }
+  let lo = Math.min(...view.map(x => x.l)), hi = Math.max(...view.map(x => x.h)); const base = hi - lo || hi * .01;
+  const extraVals = [...mas.flatMap(m => m.vals.filter(isFinite)), ...(ch ? ch.flatMap(c => [c.hi55, c.lo55]).filter(isFinite) : []), ...(ltp && (daily || view.at(-1).d === ist().date) ? [ltp] : [])];
+  lv.forEach(([, v]) => { if (v >= lo - base * .6 && v <= hi + base * .6) extraVals.push(v); });
+  extraVals.forEach(v => { if (v < lo) lo = v; if (v > hi) hi = v; });
+  const pad = (hi - lo) * .05; lo -= pad; hi += pad;
+  const L = 2, R = 50, Tp = 6, B = 18, plotB = h - B, priceB = S.vol ? Tp + (plotB - Tp) * .78 : plotB, volT = priceB + 6;
+  const extra = daily ? Math.max(3, Math.round(n * .04)) : 2, cw = (w - L - R) / (n + extra);
+  const y = v => Tp + (hi - v) / (hi - lo) * (priceB - Tp), x = i => L + (i + .5) * cw;
+  // grid
   const rough = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(rough))), stp = [1, 2, 2.5, 5, 10].map(k => k * mag).find(k => k >= rough);
   g.strokeStyle = sep; g.lineWidth = 1; g.fillStyle = ink3; g.textAlign = "left"; g.textBaseline = "middle";
-  for (let v = Math.ceil(lo / stp) * stp; v <= hi; v += stp) { const yy = Math.round(y(v)) + .5; g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.fillText(fmt(v, v >= 1000 || stp >= 1 ? 0 : 1), w - R + 6, yy); }
-  // 55D band
-  g.fillStyle = acc; g.globalAlpha = .07; g.beginPath(); let first = true;
-  ch.forEach((c, i) => { if (!isFinite(c.hi55)) return; first ? g.moveTo(x(i), y(c.hi55)) : g.lineTo(x(i), y(c.hi55)); first = false; });
-  for (let i = ch.length - 1; i >= 0; i--) if (isFinite(ch[i].lo55)) g.lineTo(x(i), y(ch[i].lo55));
-  g.closePath(); g.fill(); g.globalAlpha = 1;
-  const step = (key, col, dash, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.setLineDash(dash); g.beginPath(); let s = false, py;
-    ch.forEach((c, i) => { const v = c[key]; if (!isFinite(v)) return; const px = x(i) - cw / 2, yy = y(v); if (!s) { g.moveTo(px, yy); s = true; } else { g.lineTo(px, py); g.lineTo(px, yy); } py = yy; });
-    if (s) { g.lineTo(x(n - 1) + cw / 2, py); const v = nx[key]; if (isFinite(v)) { g.lineTo(x(n - 1) + cw / 2, y(v)); g.lineTo(w - R, y(v)); } }
-    g.stroke(); g.setLineDash([]); };
-  step("hi20", ink3, [3, 3], 1); step("lo20", ink3, [3, 3], 1); step("hi55", acc, [], 1.6); step("lo55", acc, [], 1.6);
+  for (let v = Math.ceil(lo / stp) * stp; v <= hi; v += stp) { const yy = Math.round(y(v)) + .5; g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.fillText(fmt(v, stp >= 1 ? 0 : stp >= .1 ? 1 : 2), w - R + 6, yy); }
+  // x labels and day separators
+  g.textBaseline = "alphabetic";
+  if (daily) { g.textAlign = "left"; g.fillText(niceDate(view[0].d) + " " + view[0].d.slice(2, 4), L, h - 3); g.textAlign = "right"; g.fillText(niceDate(view.at(-1).d), w - R, h - 3); }
+  else {
+    const days = new Set(view.map(v => v.d)).size; let lastX = -99;
+    view.forEach((b, i) => {
+      const newDay = i > 0 && b.d !== view[i - 1].d, xx = Math.round(x(i) - cw / 2) + .5;
+      if (newDay) { g.strokeStyle = sep; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(xx, Tp); g.lineTo(xx, plotB); g.stroke(); g.setLineDash([]); }
+      let lab = null;
+      if (days > 2 && (i === 0 || newDay)) lab = niceDate(b.d);
+      else if (days <= 2 && (newDay || i === 0)) lab = niceDate(b.d);
+      else if (days <= 2 && b.m % 60 === 0) lab = hhmm(b.m);
+      if (lab && xx - lastX > 44 && xx < w - R - 20) { g.textAlign = "left"; g.fillStyle = ink3; g.fillText(lab, xx + 2, h - 3); lastX = xx; }
+    });
+  }
+  // volume
+  if (S.vol) { const vmax = Math.max(1, ...view.map(b => b.v)); g.globalAlpha = .4;
+    view.forEach((b, i) => { const hh = (b.v / vmax) * (plotB - volT); g.fillStyle = b.c >= b.o ? up : dn; g.fillRect(x(i) - Math.max(1, cw * .62) / 2, plotB - hh, Math.max(1, cw * .62), hh); }); g.globalAlpha = 1; }
+  g.save(); g.beginPath(); g.rect(0, Tp - 2, w - R, priceB - Tp + 4); g.clip();
+  // turtle: daily channel
+  if (ch) {
+    g.fillStyle = acc; g.globalAlpha = .07; g.beginPath(); let first = true;
+    ch.forEach((c, i) => { if (!isFinite(c.hi55)) return; first ? g.moveTo(x(i), y(c.hi55)) : g.lineTo(x(i), y(c.hi55)); first = false; });
+    for (let i = ch.length - 1; i >= 0; i--) if (isFinite(ch[i].lo55)) g.lineTo(x(i), y(ch[i].lo55));
+    g.closePath(); g.fill(); g.globalAlpha = 1;
+    const nx = channels(series.map(s => ({ high: s.h, low: s.l, close: s.c })), series.length);
+    const stepLine = (key, col, dash, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.setLineDash(dash); g.beginPath(); let s = false, py;
+      ch.forEach((c, i) => { const v = c[key]; if (!isFinite(v)) return; const px = x(i) - cw / 2, yy = y(v); if (!s) { g.moveTo(px, yy); s = true; } else { g.lineTo(px, py); g.lineTo(px, yy); } py = yy; });
+      if (s) { g.lineTo(x(n - 1) + cw / 2, py); const v = nx[key]; if (isFinite(v)) { g.lineTo(x(n - 1) + cw / 2, y(v)); g.lineTo(w - R, y(v)); } }
+      g.stroke(); g.setLineDash([]); };
+    stepLine("hi20", ink3, [3, 3], 1); stepLine("lo20", ink3, [3, 3], 1); stepLine("hi55", acc, [], 1.6); stepLine("lo55", acc, [], 1.6);
+  }
+  // turtle: intraday levels
+  const offTags = [];
+  lv.forEach(([name, v, col, dash]) => { if (v < lo || v > hi) { offTags.push([name, v, v > hi]); return; }
+    const yy = Math.round(y(v)) + .5; g.strokeStyle = col; g.lineWidth = name.startsWith("55") ? 1.6 : 1; g.setLineDash(dash); g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.setLineDash([]);
+    g.fillStyle = col; g.textAlign = "right"; g.textBaseline = "bottom"; g.font = `600 10px ${tok("--font")}`; g.fillText(name, w - R - 4, yy - 2); g.font = `500 10.5px ${tok("--font")}`; });
+  // moving averages
+  mas.forEach(m => { g.strokeStyle = m.col; g.lineWidth = 1.4; g.beginPath(); let s = false; m.vals.forEach((v, i) => { if (!isFinite(v)) { s = false; return; } s ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); s = true; }); g.stroke(); });
   // candles
-  const bw = Math.max(1, Math.min(7, cw * .62));
+  const bw = Math.max(1, Math.min(8, cw * .64));
   view.forEach((d, i) => {
-    const col = d.close >= d.open ? up : dn; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
-    const xx = Math.round(x(i)) + .5; g.beginPath(); g.moveTo(xx, y(d.high)); g.lineTo(xx, y(d.low)); g.stroke();
-    const yo = y(d.open), yc = y(d.close); g.fillRect(xx - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
+    const col = d.c >= d.o ? up : dn; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
+    const xx = Math.round(x(i)) + .5; g.beginPath(); g.moveTo(xx, y(d.h)); g.lineTo(xx, y(d.l)); g.stroke();
+    const yo = y(d.o), yc = y(d.c);
+    if (d.prov) { g.lineWidth = 1.2; g.strokeRect(xx - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo))); }
+    else g.fillRect(xx - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
   });
-  if (ltp) { const yy = y(ltp), xx = x(n - 1) + cw * (extra / 2 + .5); g.strokeStyle = amb; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x(n - 1), yy); g.lineTo(w - R, yy); g.stroke(); g.setLineDash([]);
-    g.fillStyle = amb; g.beginPath(); g.arc(xx, yy, 4, 0, 7); g.fill(); g.beginPath(); g.roundRect ? g.roundRect(w - R + 2, yy - 9, R - 2, 18, 4) : g.rect(w - R + 2, yy - 9, R - 2, 18); g.fill();
-    g.fillStyle = "#fff"; g.fillText(fmt(ltp, 0), w - R + 6, yy); }
-  g.fillStyle = ink3; g.textBaseline = "alphabetic"; g.textAlign = "left"; g.fillText(niceDate(view[0].date) + " " + view[0].date.slice(2, 4), L, h - 3);
-  g.textAlign = "right"; g.fillText(niceDate(view.at(-1).date), w - R, h - 3);
+  g.restore();
+  [true, false].forEach(above => { const t = offTags.filter(o => o[2] === above).map(([name, v]) => `${name.replace(" high", "H").replace(" low", "L")} ${fmt(v, 0)}`); if (!t.length) return;
+    g.fillStyle = ink2; g.textAlign = "left"; g.textBaseline = above ? "top" : "bottom"; g.font = `600 10px ${tok("--font")}`;
+    g.fillText(`${above ? "↑" : "↓"} ${t.join(" · ")}`, L + 4, above ? Tp + 1 : priceB - 1); g.font = `500 10.5px ${tok("--font")}`; });
+  // live price
+  const showLive = ltp && (daily || view.at(-1).d === ist().date);
+  if (showLive) { const yy = y(ltp); g.strokeStyle = amb; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); g.setLineDash([]);
+    g.fillStyle = amb; g.beginPath(); g.roundRect ? g.roundRect(w - R + 2, yy - 9, R - 2, 18, 4) : g.rect(w - R + 2, yy - 9, R - 2, 18); g.fill();
+    g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(fmt(ltp, ltp >= 1000 ? 0 : 1), w - R + 6, yy); }
   // crosshair
-  S.geo = { L, cw, n, view, ch, start };
-  if (S.hover != null) { const i = S.hover, xx = Math.round(x(i)) + .5; g.strokeStyle = tok("--ink2"); g.lineWidth = 1; g.beginPath(); g.moveTo(xx, Tp); g.lineTo(xx, h - B); g.stroke(); }
+  S.geo = { L, cw, n, view, mas, daily };
+  if (S.hover != null && S.hover < n) { const xx = Math.round(x(S.hover)) + .5; g.strokeStyle = ink2; g.lineWidth = 1; g.beginPath(); g.moveTo(xx, Tp); g.lineTo(xx, plotB); g.stroke(); }
   readout();
-  // header + levels
-  const last = se.at(-1), prev = se.at(-2), ref = ltp ?? last.close, chg = ltp ? lr.chg ?? (ltp / last.close - 1) * 100 : (last.close / prev.close - 1) * 100;
+  legend(mas, showLive);
+}
+function legend(mas, live) {
+  const parts = (mas || []).map(m => `<span><i style="background:${m.col}"></i>${m.name}</span>`);
+  if (S.turtle) parts.push(S.iv === "1D" ? `<span><i style="background:var(--accent)"></i>55D</span><span><i class="dash"></i>20D</span>` : `<span><i style="background:var(--accent)"></i>55D level</span><span><i class="dash"></i>20D level</span>`);
+  if (live) parts.push(`<span><i style="background:var(--amber)"></i>Live</span>`);
+  if (S.iv === "1D" && S.bars[S.sym]?.data?.days && dailySeries(S.prices.get(S.sym), liveRow()).at(-1).prov) parts.push(`<span>Hollow candle = today so far</span>`);
+  $("#cLegend").innerHTML = parts.join("");
+}
+function headerAndLevels(se, lr) {
+  const ltp = lr?.ltp, last = se.at(-1), prev = se.at(-2), ref = ltp ?? last.close, nx = channels(se, se.length);
+  const chg = ltp ? lr.chg ?? (ltp / last.close - 1) * 100 : (last.close / prev.close - 1) * 100;
   $("#cSym").textContent = S.sym; $("#cPx").textContent = fmt(ref);
   $("#cSub").innerHTML = `<span class="${chg >= 0 ? "up" : "down"}">${pct(chg)}</span> · ${ltp ? "live" : "close " + niceDate(last.date)}`;
-  const row = (k, v, cls) => `<div class="kv"><span>${k}</span><span>${fmt(v)}</span><span class="${cls || ""}">${isFinite(v) && cls !== "x" ? pct((v / ref - 1) * 100) + " away" : ""}</span></div>`;
+  const row = (k, v, cls) => `<div class="kv"><span>${k}</span><span>${fmt(v)}</span><span class="${cls || ""}">${isFinite(v) ? pct((v / ref - 1) * 100) + " away" : ""}</span></div>`;
   $("#cLevels").innerHTML = row("55D high", nx.hi55, "up") + row("20D high", nx.hi20, "up") + row("20D low", nx.lo20, "down") + row("55D low", nx.lo55, "down") +
     `<div class="kv"><span>ATR 20</span><span>${fmt(nx.atr)}</span><span></span></div><div class="kv"><span>Near zone (${S.live?.near_atr ?? 0.3}× ATR)</span><span>${fmt(nx.atr * (S.live?.near_atr ?? 0.3))}</span><span></span></div>`;
 }
@@ -666,9 +797,11 @@ async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } r
 
 function readout() {
   const G = S.geo, el = $("#readout"); if (!G) return;
-  if (S.hover == null) { el.textContent = "Drag across the chart to read a day"; return; }
-  const d = G.view[S.hover], c = G.ch[S.hover];
-  el.innerHTML = `<b>${niceDate(d.date)}</b> O ${fmt(d.open)} H ${fmt(d.high)} L ${fmt(d.low)} C <b>${fmt(d.close)}</b> · 55D ${fmt(c.hi55, 0)}/${fmt(c.lo55, 0)}`;
+  const i = S.hover != null && S.hover < G.n ? S.hover : G.n - 1, d = G.view[i];
+  const when = G.daily ? niceDate(d.d) + (d.prov ? " (today)" : "") : `${niceDate(d.d)} ${hhmm(d.m)}`;
+  const mv = G.mas.map(m => isFinite(m.vals[i]) ? `<span style="color:${m.col}">${m.name} ${fmt(m.vals[i])}</span>` : "").join(" ");
+  const kv = (k, v) => `<span style="white-space:nowrap">${k} ${v}</span>`;
+  el.innerHTML = `<b>${when}</b> ${kv("O", fmt(d.o))} ${kv("H", fmt(d.h))} ${kv("L", fmt(d.l))} ${kv("C", `<b>${fmt(d.c)}</b>`)} ${kv("V", big(d.v))}${mv ? "<br>" + mv : ""}`;
 }
 function hoverAt(ev) {
   const G = S.geo; if (!G) return; const r = $("#pc").getBoundingClientRect();
@@ -740,7 +873,7 @@ async function refresh() {
   try {
     if (!S.token) { loadSample(); S.err = ""; }
     else {
-      if (S.sample) { S.sample = false; S.prices = null; S.oc = null; S.ocAt = 0; }
+      if (S.sample) { S.sample = false; S.prices = null; S.oc = null; S.ocAt = 0; S.bars = {}; }
       const [lv, sm, sg] = await Promise.all([file("LIVE.json", "live"), file("data/summary.csv"), file("data/signals_latest.csv")]);
       try { S.live = lv ? JSON.parse(lv) : null; } catch { S.live = null; }
       S.summary = csv(sm); S.signals = csv(sg); S.err = "";
@@ -748,7 +881,7 @@ async function refresh() {
   } catch (e) { S.err = e.message; }
   busy = false; $("#refresh").classList.remove("spin");
   notice(); paintStatus(); renderLive(); renderDay(); paintRun();
-  if (S.tab === "chart") { if (S.prices) { drawChart(); showOC(); } else openChart(); }
+  if (S.tab === "chart") { if (S.prices) { drawChart(); showOC(); const s0 = S.sym; ensureBars(s0).then(() => { if (S.sym === s0) drawChart(); }); } else openChart(); }
 }
 
 /* ---------- nav ---------- */
@@ -770,7 +903,10 @@ document.addEventListener("click", e => {
   const lf = e.target.closest("[data-lf]"); if (lf) { S.liveF = S.liveF === lf.dataset.lf ? null : lf.dataset.lf; return renderLive(); }
   const df = e.target.closest("[data-df]"); if (df) { S.dayF = S.dayF === df.dataset.df ? null : df.dataset.df; return renderDay(); }
   const wb = e.target.closest("#winSeg button"); if (wb) { S.win = wb.dataset.w; $$("#winSeg button").forEach(b => b.setAttribute("aria-pressed", b === wb)); return renderLive(); }
-  const rb = e.target.closest("#rangeSeg button"); if (rb) { S.n = +rb.dataset.n; S.hover = null; $$("#rangeSeg button").forEach(b => b.setAttribute("aria-pressed", b === rb)); return drawChart(); }
+  const rb = e.target.closest("#rangeSeg button"); if (rb) { S.n = +rb.dataset.n; store.set("n", S.n); S.hover = null; paintChartControls(); return drawChart(); }
+  const ib = e.target.closest("#ivSeg button"); if (ib) { S.iv = ib.dataset.iv; store.set("iv", S.iv); S.hover = null; paintChartControls(); drawChart(); if (S.iv !== "1D") ensureBars(S.sym).then(() => drawChart()); return; }
+  const mc = e.target.closest("[data-ma]"); if (mc) { const k = mc.dataset.ma; S.mas = S.mas.includes(k) ? S.mas.filter(x => x !== k) : [...S.mas, k]; store.set("mas", S.mas.join(",")); paintChartControls(); return drawChart(); }
+  const oc2 = e.target.closest("[data-opt]"); if (oc2) { const k = oc2.dataset.opt; S[k] = !S[k]; store.set(k, S[k] ? "1" : "0"); paintChartControls(); return drawChart(); }
   const mb = e.target.closest("#modeSeg button"); if (mb) { S.mode = mb.dataset.m; return paintRun(); }
   if (e.target.closest("#kiteLogin[aria-disabled]")) { e.preventDefault(); $("#setDetails").open = true; $("#apiKey").focus(); return; }
   if (S.hover != null && !e.target.closest("#pc")) { S.hover = null; drawChart(); }
@@ -793,7 +929,7 @@ $("#setForm").addEventListener("submit", async e => {
   } catch (err) { $("#setState").innerHTML = `<span class="bad">${esc(err.message)}</span>`; }
   paintRun();
 });
-$("#forget").addEventListener("click", () => { S.token = ""; store.del("token"); S.prices = null; S.oc = null; S.ocAt = 0; $("#setState").textContent = "Token removed from this phone."; refresh(); });
+$("#forget").addEventListener("click", () => { S.token = ""; store.del("token"); S.prices = null; S.oc = null; S.ocAt = 0; S.bars = {}; $("#setState").textContent = "Token removed from this phone."; refresh(); });
 
 // Redraw charts only when their width really changes (iOS fires resize while scrolling as the address bar moves).
 let lastW = 0;
