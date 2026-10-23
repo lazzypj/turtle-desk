@@ -148,6 +148,29 @@ canvas { display: block; touch-action: pan-y; }
 .crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .readout { white-space: normal; min-height: 36px; line-height: 1.45; }
 
+/* journal */
+.jnav { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 0; }
+.jnav b { font-size: 16px; }
+.jnav .round { font-size: 20px; font-weight: 600; line-height: 1; }
+.jsum { margin-top: 12px; display: grid; gap: 12px; }
+.jbig small, .jgrid small { font-size: 12px; color: var(--ink2); font-weight: 500; }
+.jgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; border-top: .5px solid var(--sep); padding-top: 12px; }
+.jgrid div { display: grid; gap: 1px; min-width: 0; }
+.jgrid b { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.jcal { padding: 10px; }
+.jdow, .jcells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.jdow span { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink3); padding-bottom: 4px; }
+.jday { border: 0; border-radius: 8px; background: var(--fill); aspect-ratio: 1 / 1.05; display: grid; align-content: center; justify-items: center; gap: 1px; padding: 2px; cursor: pointer; min-width: 0; color: var(--ink); }
+.jday span { font-size: 12.5px; font-weight: 600; }
+.jday em { font-style: normal; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.jday.out { opacity: .3; }
+.jday.wk { background: transparent; }
+.jday.sel { box-shadow: inset 0 0 0 2px var(--ink); }
+.jday.today span { color: var(--accent); }
+.kv small { display: block; font-size: 11.5px; color: var(--ink3); }
+.jw { cursor: pointer; }
+.meta.wrap { white-space: normal; }
+
 /* chart reading */
 .ta-head { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 12px 14px 4px; }
 .ta-notes { margin: 6px 0 4px; padding: 0 14px 0 30px; display: grid; gap: 6px; font-size: 14px; line-height: 1.45; }
@@ -218,7 +241,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
 /* tab bar */
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); border-top: .5px solid var(--sep);
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
-.tabs .in { max-width: 640px; margin: 0 auto; height: var(--tab-h); display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabs .in { max-width: 640px; margin: 0 auto; height: var(--tab-h); display: grid; grid-template-columns: repeat(5, 1fr); }
 .tabs button { border: 0; background: none; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--ink3); cursor: pointer; }
 .tabs svg { width: 24px; height: 24px; }
 .tabs button[aria-current="page"] { color: var(--accent); }
@@ -287,6 +310,13 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
   </section>
 
+  <section id="s-journal" aria-label="Journal">
+    <div class="ttl">Journal</div>
+    <div class="seg" id="jViewSeg" role="group" aria-label="Period" style="margin-top:10px"><button data-jv="week">Week</button><button data-jv="month">Month</button><button data-jv="all">All</button></div>
+    <div class="jnav"><button class="round" id="jPrev" aria-label="Previous">‹</button><b id="jLabel"></b><button class="round" id="jNext" aria-label="Next">›</button></div>
+    <div id="journalBody"></div>
+  </section>
+
   <section id="s-run" aria-label="Run">
     <div class="ttl">Run</div>
     <div class="cap" id="runCap"></div>
@@ -337,6 +367,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
   <button data-tab="live" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Live</button>
   <button data-tab="day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Day end</button>
   <button data-tab="chart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>Stock</button>
+  <button data-tab="journal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h2M14 14h2M8 17h2"/></svg>Journal</button>
   <button data-tab="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z" fill="currentColor"/></svg>Run</button>
 </div></nav>
 
@@ -359,6 +390,7 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
+  jView: "month", jAnchor: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), jDay: null, journal: null,
   sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
 };
 
@@ -987,6 +1019,111 @@ function renderTA() {
     <div class="ocfoot">Read automatically from swing highs and lows on the daily chart (each swing is the extreme of 5 days either side). Patterns are approximate; check them on the chart.</div>`;
 }
 
+/* ---------- JOURNAL ---------- */
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const dUTC = s => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const sUTC = d => d.toISOString().slice(0, 10);
+const addDays = (s, n) => { const d = dUTC(s); d.setUTCDate(d.getUTCDate() + n); return sUTC(d); };
+const weekStart = s => { const d = dUTC(s), wd = (d.getUTCDay() + 6) % 7; return addDays(s, -wd); };
+const rupee = (v, sign = true) => (v == null || !isFinite(v)) ? "–" : (sign && v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+const kcompact = v => { const a = Math.abs(v), s = v > 0 ? "+" : v < 0 ? "−" : ""; return s + (a >= 1e5 ? (a / 1e5).toFixed(1) + "L" : a >= 1e3 ? (a / 1e3).toFixed(1) + "K" : a.toFixed(0)); };
+const SIG = { after_break: ["After confirmed break", "UP"], near: ["Near the level only", "near"], none: ["No scanner alert", "flat"], no_watch: ["Live watch not running", "flat"] };
+
+function sampleJournal() {
+  const r = rng(42), trips = []; let d = addDays(ist().date, -45);
+  const syms = ["SAMPLE-ALPHA", "SAMPLE-BETA", "SAMPLE-GAMMA", "SAMPLE-DELTA", "SAMPLE-ETA"];
+  while (d <= ist().date) {
+    const wd = dUTC(d).getUTCDay();
+    if (wd && wd < 6 && r() > .35) for (let k = 0, n = 1 + Math.floor(r() * 4); k < n; k++) {
+      const sig = r() < .6 ? "after_break" : r() < .5 ? "near" : "none", win = r() < (sig === "after_break" ? .62 : .4);
+      const ret = win ? 10 + r() * 30 : -(8 + r() * 10), cost = 3000 + r() * 4000, gross = cost * ret / 100, ch = 50 + r() * 15;
+      const m = 555 + Math.floor(r() * 120), hold = 3 + Math.floor(r() * 25);
+      trips.push({ date: d, symbol: "", underlying: syms[Math.floor(r() * syms.length)], opt: r() < .5 ? "CE" : "PE", strike: 100 * Math.ceil(r() * 20), dir: "long", qty: 500,
+        entry_time: hhmm(m) + ":00", exit_time: hhmm(m + hold) + ":00", buy_avg: cost / 500, sell_avg: (cost + gross) / 500, gross, charges: ch, net: gross - ch, ret_pct: ret, hold_min: hold, signal: sig, delay_min: sig === "after_break" ? Math.floor(r() * 15) : null });
+    }
+    d = addDays(d, 1);
+  }
+  return { sample: true, trips, open: [] };
+}
+function jStats(ts) {
+  const n = ts.length, wins = ts.filter(t => t.net > 0), losses = ts.filter(t => t.net <= 0), sum = (a, k) => a.reduce((s, t) => s + (t[k] || 0), 0);
+  return { n, net: sum(ts, "net"), gross: sum(ts, "gross"), charges: sum(ts, "charges"), win: n ? wins.length / n * 100 : 0,
+    avgWin: wins.length ? sum(wins, "net") / wins.length : null, avgLoss: losses.length ? sum(losses, "net") / losses.length : null,
+    best: n ? Math.max(...ts.map(t => t.net)) : null, worst: n ? Math.min(...ts.map(t => t.net)) : null,
+    hold: n ? sum(ts, "hold_min") / n : null, days: new Set(ts.map(t => t.date)).size };
+}
+function jPeriod() {
+  const trips = S.journal?.trips || [], v = S.jView;
+  if (v === "all") return { from: "0000", to: "9999", label: "All time", trips };
+  if (v === "week") { const a = weekStart(S.jAnchor), b = addDays(a, 6); return { from: a, to: b, label: `${niceDate(a)} – ${niceDate(b)}`, trips: trips.filter(t => t.date >= a && t.date <= b) }; }
+  const m = S.jAnchor.slice(0, 7), [y, mo] = m.split("-").map(Number);
+  return { from: m + "-01", to: m + "-31", label: `${MONTHS[mo - 1]} ${y}`, trips: trips.filter(t => t.date.startsWith(m)) };
+}
+function renderJournal() {
+  const el = $("#journalBody"); if (!el) return;
+  if (!S.journal) { el.innerHTML = `<div class="list"><div class="empty">No journal yet. Your trades are saved automatically at the end of each live watch and by the day-end scan.</div></div>`; return; }
+  const P = jPeriod(), st = jStats(P.trips);
+  $$("#jViewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.jv === S.jView));
+  $("#jLabel").textContent = P.label; $("#jPrev").hidden = $("#jNext").hidden = S.jView === "all";
+  // summary
+  const tile = (k, v, cls = "") => `<div><small>${k}</small><b class="${cls}">${v}</b></div>`;
+  let html = `<div class="card jsum">
+      <div class="jbig"><small>Net P&amp;L${S.journal.sample ? " · sample" : ""}</small><div class="big ${st.net > 0 ? "up" : st.net < 0 ? "down" : ""}">${st.n ? rupee(st.net) : "–"}</div>
+        <div class="cap">${st.n ? `Gross ${rupee(st.gross)} · charges ≈ ₹${fmt(st.charges, 0)}` : "No closed trades in this period"}</div></div>
+      <div class="jgrid">${tile("Trades", st.n || "–")}${tile("Win rate", st.n ? st.win.toFixed(0) + "%" : "–")}${tile("Days traded", st.days || "–")}
+        ${tile("Avg win", rupee(st.avgWin), "up")}${tile("Avg loss", rupee(st.avgLoss), "down")}${tile("Avg hold", st.hold != null ? st.hold.toFixed(0) + " min" : "–")}</div></div>`;
+  // calendar (month of the anchor)
+  const m = S.jAnchor.slice(0, 7), first = m + "-01", startW = weekStart(first), byDay = {};
+  (S.journal.trips || []).forEach(t => { (byDay[t.date] = byDay[t.date] || []).push(t); });
+  const maxAbs = Math.max(1, ...Object.entries(byDay).filter(([d]) => d.startsWith(m)).map(([, ts]) => Math.abs(ts.reduce((s, t) => s + t.net, 0))));
+  let cells = "", d = startW;
+  for (let i = 0; i < 42; i++) {
+    const inMonth = d.startsWith(m), ts = byDay[d] || [], net = ts.reduce((s, t) => s + t.net, 0), wk = i % 7 >= 5;
+    if (i >= 35 && !inMonth && d > first) break;
+    const a = ts.length ? Math.min(1, .25 + .75 * Math.abs(net) / maxAbs) : 0;
+    const bg = ts.length ? `background:color-mix(in srgb, var(${net >= 0 ? "--up" : "--down"}) ${Math.round(a * 55)}%, var(--card))` : "";
+    cells += `<button class="jday${inMonth ? "" : " out"}${wk ? " wk" : ""}${d === S.jDay ? " sel" : ""}${d === ist().date ? " today" : ""}" data-jd="${d}" style="${bg}" ${ts.length ? "" : 'tabindex="-1"'}>
+      <span>${+d.slice(8)}</span>${ts.length ? `<em>${kcompact(net)}</em>` : ""}</button>`;
+    d = addDays(d, 1);
+  }
+  html += `<div class="gh">Calendar <span>tap a day</span></div><div class="card jcal"><div class="jdow">${DOW.map(x => `<span>${x}</span>`).join("")}</div><div class="jcells">${cells}</div></div>`;
+  // weekly breakdown in month view
+  if (S.jView === "month") {
+    const weeks = {};
+    P.trips.forEach(t => { const w = weekStart(t.date); (weeks[w] = weeks[w] || []).push(t); });
+    const ws = Object.keys(weeks).sort().reverse();
+    if (ws.length) html += `<div class="gh">By week</div><div class="list">${ws.map(w => { const s2 = jStats(weeks[w]);
+      return `<div class="kv jw" data-jw="${w}" role="button"><span>${niceDate(w)} – ${niceDate(addDays(w, 6))}<small>${s2.n} trade${s2.n === 1 ? "" : "s"} · ${s2.win.toFixed(0)}% won</small></span><span></span><span class="${s2.net >= 0 ? "up" : "down"}" style="font-weight:700">${rupee(s2.net)}</span></div>`; }).join("")}</div>`;
+  }
+  // by signal match
+  if (P.trips.length) {
+    const groups = {}; P.trips.forEach(t => { (groups[t.signal || "none"] = groups[t.signal || "none"] || []).push(t); });
+    html += `<div class="gh">By entry vs scanner</div><div class="list">${Object.keys(SIG).filter(k => groups[k]).map(k => { const s2 = jStats(groups[k]);
+      return `<div class="kv"><span>${SIG[k][0]}<small>${s2.n} trade${s2.n === 1 ? "" : "s"} · ${s2.win.toFixed(0)}% won${k === "after_break" ? ` · avg wait ${Math.round(groups[k].reduce((s, t) => s + (t.delay_min || 0), 0) / s2.n)} min` : ""}</small></span><span></span><span class="${s2.net >= 0 ? "up" : "down"}" style="font-weight:700">${rupee(s2.net)}</span></div>`; }).join("")}</div>`;
+  }
+  // day detail
+  const day = S.jDay && byDay[S.jDay] ? S.jDay : null;
+  if (day) {
+    const ts = byDay[day], s2 = jStats(ts);
+    html += `<div class="gh">${niceDate(day)} ${day.slice(0, 4)} <span class="${s2.net >= 0 ? "up" : "down"}" style="font-weight:700">${rupee(s2.net)}</span></div><div class="list">${ts.map(t => {
+      const sig = t.signal === "after_break" ? `after break +${t.delay_min} min` : t.signal === "near" ? "near level, no break yet" : t.signal === "none" ? "no alert" : "watch off";
+      const name = `${t.underlying} ${t.strike ? fmt(t.strike, t.strike % 1 ? 1 : 0) : ""} ${t.opt || ""}`.trim();
+      return `<div class="cell" data-sym="${esc(t.underlying)}" role="button" tabindex="0"><div class="sym"><span class="mark ${t.opt === "PE" ? "DOWN" : "UP"}"></span><em>${esc(name)}</em></div><div class="px ${t.net >= 0 ? "up" : "down"}">${rupee(t.net)}</div>
+        <div class="meta wrap">${(t.entry_time || "").slice(0, 5)} → ${(t.exit_time || "").slice(0, 5)} · ${t.hold_min != null ? Math.round(t.hold_min) + " min" : ""} · ${fmt(t.buy_avg)} → ${fmt(t.sell_avg)} · ${sig}</div>
+        <div class="pill ${t.ret_pct > 0 ? "UP" : "DOWN"}">${pct(t.ret_pct, 1)}</div></div>`; }).join("")}</div>`;
+  } else if (P.trips.length) html += `<p class="foot">Tap a coloured day in the calendar to see its trades.</p>`;
+  if (S.journal.open?.length) html += `<div class="gh">Open positions</div><div class="list">${S.journal.open.map(t => `<div class="kv"><span>${esc(t.underlying)} ${t.strike ? fmt(t.strike, 0) : ""} ${t.opt}<small>since ${niceDate(t.date)} ${t.entry_time.slice(0, 5)}</small></span><span>${t.open_qty} @ ${fmt(t.buy_avg ?? t.sell_avg)}</span><span></span></div>`).join("")}</div>`;
+  html += `<p class="foot">Trades are pulled from Kite at the end of each live watch and by the day-end scan (Kite only shares the current day's trades, so run one of them on days you trade). Charges are estimates; your contract note has the exact figures.</p>`;
+  el.innerHTML = html;
+}
+async function loadJournal() {
+  if (!S.token) { S.journal = sampleJournal(); }
+  else { try { const t = await file("data/journal/journal.json"); S.journal = t ? JSON.parse(t) : null; } catch { S.journal = null; } }
+  if (S.journal && !S.jDay) { const ds = (S.journal.trips || []).map(t => t.date).sort(); S.jDay = ds.at(-1) || null; if (S.jDay) S.jAnchor = S.jDay; }
+  renderJournal();
+}
+
 /* ---------- OPTION CHAIN ---------- */
 function ncdf(x) { const t = 1 / (1 + .2316419 * Math.abs(x)), d = .3989423 * Math.exp(-x * x / 2), p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
 function bs(s, k, t, r, v, call) { const sq = v * Math.sqrt(t), d1 = (Math.log(s / k) + (r + v * v / 2) * t) / sq, d2 = d1 - sq; return call ? s * ncdf(d1) - k * Math.exp(-r * t) * ncdf(d2) : k * Math.exp(-r * t) * ncdf(-d2) - s * ncdf(-d1); }
@@ -1148,6 +1285,7 @@ async function refresh() {
   } catch (e) { S.err = e.message; }
   busy = false; $("#refresh").classList.remove("spin");
   notice(); paintStatus(); renderLive(); renderDay(); paintRun();
+  if (S.tab === "journal") loadJournal();
   if (S.tab === "chart") { if (S.prices) { drawChart(); showOC(); const s0 = S.sym; ensureBars(s0).then(() => { if (S.sym === s0) drawChart(); }); } else openChart(); }
 }
 
@@ -1160,11 +1298,19 @@ function go(tab, fromChart = false) {
   if (tab === "day") drawBreadth();
   if (tab === "chart" && !fromChart) openChart();
   if (tab === "run") loadRuns();
+  if (tab === "journal") loadJournal();
 }
 function toast(msg, ms = 3500) { $$(".toast").forEach(t => t.remove()); const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), ms); }
 
 document.addEventListener("click", e => {
   const tb = e.target.closest(".tabs button"); if (tb) return go(tb.dataset.tab);
+  const jv = e.target.closest("#jViewSeg button"); if (jv) { S.jView = jv.dataset.jv; return renderJournal(); }
+  const jn = e.target.closest("#jPrev, #jNext"); if (jn) { const dir = jn.id === "jNext" ? 1 : -1;
+    if (S.jView === "week") S.jAnchor = addDays(S.jAnchor, 7 * dir);
+    else { const [y, m] = S.jAnchor.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1 + dir, 1)); S.jAnchor = sUTC(d); }
+    return renderJournal(); }
+  const jd = e.target.closest("[data-jd]"); if (jd) { S.jDay = jd.dataset.jd; if (!jd.dataset.jd.startsWith(S.jAnchor.slice(0, 7))) S.jAnchor = jd.dataset.jd; return renderJournal(); }
+  const jw = e.target.closest("[data-jw]"); if (jw) { S.jView = "week"; S.jAnchor = jw.dataset.jw; return renderJournal(); }
   const gb = e.target.closest("[data-go]"); if (gb) { go(gb.dataset.go); $("#setDetails").open = true; return; }
   const sy = e.target.closest("[data-sym]"); if (sy) return openChart(sy.dataset.sym);
   const lf = e.target.closest("[data-lf]"); if (lf) { S.liveF = S.liveF === lf.dataset.lf ? null : lf.dataset.lf; return renderLive(); }
@@ -1205,7 +1351,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-22.5";
+const APP_VERSION = "2026-10-23.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1220,7 +1366,7 @@ async function checkUpdate() {
 /* ---------- boot ---------- */
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
-go(["live", "day", "chart", "run"].includes(S.tab) ? S.tab : "live");
+go(["live", "day", "chart", "journal", "run"].includes(S.tab) ? S.tab : "live");
 refresh(); checkUpdate();
 setInterval(() => { paintStatus(); if (document.visibilityState === "visible" && S.token && market().k !== "closed" && S.tab !== "run") refresh(); }, 30000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { checkUpdate(); if (S.token) refresh(); } });
