@@ -148,6 +148,14 @@ canvas { display: block; touch-action: pan-y; }
 .crow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .readout { white-space: normal; min-height: 36px; line-height: 1.45; }
 
+/* market strip */
+.mkt { margin-top: 12px; background: var(--card); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
+.mkt-row { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: baseline; font-size: 14px; }
+.mkt-row b { font-size: 15px; } .mkt-row small { font-size: 12px; color: var(--ink2); font-weight: 600; letter-spacing: .02em; }
+.mkt-bias { font-size: 13px; color: var(--ink2); }
+.tagc { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--fill); color: var(--ink2); margin-left: 2px; vertical-align: 1px; }
+.tagc.fresh { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+
 /* journal */
 .jnav { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 0; }
 .jnav b { font-size: 16px; }
@@ -264,9 +272,11 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
   <section id="s-live" class="on" aria-label="Live">
     <div class="ttl">Live</div>
     <div class="cap" id="liveCap">No live run yet</div>
+    <div class="mkt" id="mktCard" hidden></div>
     <div class="seg" id="winSeg" role="group" aria-label="Window" style="margin-top:12px">
       <button data-w="all" aria-pressed="true">20D + 55D</button><button data-w="55" aria-pressed="false">55D only</button><button data-w="20" aria-pressed="false">20D only</button>
     </div>
+    <div class="chips" id="liveChips" style="margin:10px 0 0;padding:0"></div>
     <div class="strip" id="liveStrip"></div>
     <div id="liveLists"></div>
     <div class="gh">Alerts <span id="alCount"></span></div>
@@ -339,6 +349,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
         <div class="two" id="liveOpts">
           <div><label for="mins">Minutes</label><input type="number" id="mins" min="5" max="120" value="75" inputmode="numeric"></div>
           <div><label for="nearAtr">Near (× ATR)</label><input type="number" id="nearAtr" min="0.05" max="3" step="0.05" value="0.3" inputmode="decimal"></div>
+          <div><label for="quiet">Alerts from</label><input type="time" id="quiet" value="09:18" min="09:15" max="15:29"></div>
         </div>
         <div id="btOpts"><label for="btDays">Days to test</label><input type="number" id="btDays" min="60" max="400" value="180" inputmode="numeric"></div>
         <div class="hint" id="modeHint"></div>
@@ -358,6 +369,18 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
         <div class="frow"><label for="apiKey">Kite API key</label><input type="text" id="apiKey" autocapitalize="off" spellcheck="false" placeholder="api_key, not the secret"></div>
         <div class="frow"><button class="btn primary" type="submit">Save and connect</button><button class="btn" type="button" id="forget">Forget token</button><div class="hint" id="setState"></div></div>
       </form>
+    </details>
+    <div class="gh">Phone alerts</div>
+    <details class="list" id="alertHelp">
+      <summary><span>Set up break alerts on your phone</span><span class="chev">›</span></summary>
+      <div class="frow"><div class="hint" style="font-size:13.5px;line-height:1.5">
+        1. Install the free <b>ntfy</b> app from the App Store.<br>
+        2. Pick a private topic name. Use this one, or make your own (it works like a password):
+        <div class="row" style="display:flex;gap:8px;align-items:center;margin:6px 0"><code id="topicSug" style="font-size:14px;background:var(--fill);padding:6px 8px;border-radius:6px;user-select:all"></code><button class="btn" id="copyTopic" type="button" style="width:auto;padding:6px 12px;font-size:14px">Copy</button></div>
+        3. In GitHub: Turtle-strategy › Settings › Secrets and variables › Actions › New repository secret. Name <b>NTFY_TOPIC</b>, value: the topic.<br>
+        4. In the ntfy app, tap <b>+</b> and subscribe to the same topic.<br>
+        From the next live watch you get one alert when the watch starts, one per fresh break after the quiet time (at most one per stock every 15 minutes), and one when it ends. Tapping an alert opens that stock here.
+      </div></div>
     </details>
     <p class="foot">Kite data is for your own use. Don’t save your token on a shared device.</p>
   </section>
@@ -390,6 +413,7 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
+  brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1",
   jView: "month", jAnchor: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), jDay: null, journal: null,
   sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
 };
@@ -506,30 +530,52 @@ function liveRows() {
   return L.rows.map(r => { const top = Math.max(...ws.map(w => r["s" + w] || 0)), w = ws.find(x => r["s" + x] === top) ?? ws[0]; return { ...r, vt: top, vw: w, vl: r["l" + w], g: r.side + top }; }).filter(r => r.vt > 0);
 }
 const GROUPS = { UP2: ["Breakouts", "UP"], UP1: ["Near breakout", "UP"], DOWN2: ["Breakdowns", "DOWN"], DOWN1: ["Near breakdown", "DOWN"] };
+function renderMarket() {
+  const L = S.live, m = L?.market, el = $("#mktCard");
+  if (!L || !m || (!m.nifty && !m.banknifty)) { el.hidden = true; return; }
+  const all = liveRows(), cnt = (side, fresh) => all.filter(r => r.side === side && r.vt === 2 && (!fresh || r.fresh)).length;
+  const ix = (name, x) => x ? `<span><small>${name}</small> <b>${fmt(x.ltp, 0)}</b> <span class="${x.chg >= 0 ? "up" : "down"}" style="font-weight:600">${pct(x.chg)}</span></span>` : "";
+  const up = cnt("UP"), dn = cnt("DOWN"), upF = cnt("UP", true), dnF = cnt("DOWN", true);
+  const nchg = m.nifty?.chg;
+  let bias = "";
+  if (nchg != null) {
+    const mk = nchg <= -0.4 ? "Market is falling" : nchg >= 0.4 ? "Market is rising" : "Market is flat";
+    const lean = dn >= 2 * Math.max(1, up) ? "breakdowns lead" : up >= 2 * Math.max(1, dn) ? "breakouts lead" : "breaks are mixed";
+    bias = `${mk}; ${lean}.`;
+  }
+  el.innerHTML = `<div class="mkt-row">${ix("NIFTY", m.nifty)}${ix("BANK NIFTY", m.banknifty)}</div>
+    <div class="mkt-bias">Breaks <b class="up">▲${up}</b> <b class="down">▼${dn}</b> · fresh after ${esc(L.quiet_until || "09:18")} <b class="up">▲${upF}</b> <b class="down">▼${dnF}</b>${bias ? ` · ${bias}` : ""}</div>`;
+  el.hidden = false;
+}
 function renderLive() {
-  const L = S.live, rows = liveRows(), ls = liveState();
+  const L = S.live, ls = liveState();
+  const rows = liveRows().filter(r => !(S.hideOpen && r.vt === 2 && (r.gap || r.opening)));
+  renderMarket();
+  $("#liveChips").innerHTML = `<button class="chip" data-lopt="brkOnly" aria-pressed="${S.brkOnly}"><i style="background:var(--down)"></i>Breaks only</button><button class="chip" data-lopt="hideOpen" aria-pressed="${S.hideOpen}"><i style="background:var(--ink3)"></i>Hide opening &amp; gap moves</button>`;
   $("#liveCap").textContent = !L ? "No live run yet. Start one from Run." :
     ls.k === "sample" ? "Sample data" : ls.k === "live" ? `Updated ${ls.hm} · ${L.stocks} F&O stocks · near = ${L.near_atr}× ATR` :
     ls.k === "stopped" ? `Watch stopped at ${ls.hm} · ${L.stocks} F&O stocks` : `Last live run ${niceDate(L.date)}`;
   const n = k => rows.filter(r => r.g === k).length;
   $("#liveStrip").innerHTML = [["UP2", "▲ Breakout", "up"], ["UP1", "▲ Near", "up"], ["DOWN2", "▼ Breakdown", "down"], ["DOWN1", "▼ Near", "down"]]
     .map(([k, t, c]) => `<button data-lf="${k}" aria-pressed="${S.liveF === k}"><b class="${c}">${L ? n(k) : "–"}</b><small>${t}</small></button>`).join("");
-  const keys = S.liveF ? [S.liveF] : Object.keys(GROUPS);
+  const keys = S.liveF ? [S.liveF] : Object.keys(GROUPS).filter(k => !S.brkOnly || k.endsWith("2"));
   $("#liveLists").innerHTML = !L ? `<div class="gh">Stocks</div><div class="list"><div class="empty">Nothing yet. Start a live watch from Run before 09:15.</div></div>` : keys.map(k => {
-    const sel = rows.filter(r => r.g === k).sort((a, b) => b.since.localeCompare(a.since));
+    const sel = rows.filter(r => r.g === k).sort((a, b) => (b.fresh - a.fresh) || b.since.localeCompare(a.since));
     const [name, side] = GROUPS[k];
     if (!sel.length && !S.liveF) return "";
     return `<div class="gh">${name} <span>${sel.length}</span></div><div class="list">${sel.length ? sel.map(r => {
       const d = (r.ltp / r.vl - 1) * 100, both = S.win === "all" && r.s55 && r.s20 && r.vw === 55 ? " · 20D too" : "";
       const [p, pc] = chgPill(r.chg);
+      const tag = r.vt === 2 ? (r.gap ? `<span class="tagc">Gap open</span>` : r.opening ? `<span class="tagc">Opening move</span>` : r.fresh ? `<span class="tagc fresh">Fresh</span>` : "") : "";
+      const vol = r.rvol != null ? `<span class="${r.rvol >= 2 ? "hot" : ""}">vol ${r.rvol.toFixed(1)}×</span>` : `<span class="${r.vol_pct >= 150 ? "hot" : ""}">vol ${(r.vol_pct / 100).toFixed(1)}× day avg</span>`;
       return cell({ sym: r.symbol, side, hollow: r.vt === 1, px: fmt(r.ltp), pill: p, pillCls: pc,
-        meta: `${esc(r.since)} · ${r.vw}D ${pct(d, 1)}${both} · <span class="${r.vol_pct >= 150 ? "hot" : ""}">vol ${(r.vol_pct / 100).toFixed(1)}×</span>` });
+        meta: `${esc(r.since)} ${tag} · ${r.vw}D ${pct(d, 1)}${both} · ${vol}` });
     }).join("") : `<div class="empty">None right now.</div>`}</div>`;
   }).join("") || `<div class="gh">Stocks</div><div class="list"><div class="empty">No stock is near a 20D or 55D level right now.</div></div>`;
   const ev = (L?.events || []).filter(e => S.win === "all" || String(e.window) === S.win).slice(0, 40);
   $("#alCount").textContent = ev.length ? `${ev.length} latest` : "";
   $("#alerts").innerHTML = ev.length ? ev.map(e => `<div class="al" data-sym="${esc(e.symbol)}" role="button" tabindex="0"><time>${esc(e.time)}</time>
-    <div class="w"><b>${esc(e.symbol)}</b> <span class="cap">${e.status === "BREAKOUT" ? (e.side === "UP" ? "crossed" : "broke") : "near"} ${e.window}D ${e.side === "UP" ? "high" : "low"} · ${fmt(e.ltp)}</span></div>
+    <div class="w"><b>${esc(e.symbol)}</b> <span class="cap">${e.status === "BREAKOUT" ? (e.side === "UP" ? "crossed" : "broke") : "near"} ${e.window}D ${e.side === "UP" ? "high" : "low"} · ${fmt(e.ltp)}${e.gap ? " · gap open" : e.phase === "opening" || e.phase === "start" ? " · opening" : ""}</span></div>
     <span class="badge ${e.status === "BREAKOUT" ? e.side : "near"}">${e.status === "BREAKOUT" ? (e.side === "UP" ? "BREAKOUT" : "BREAKDOWN") : "NEAR"}</span></div>`).join("")
     : `<div class="empty">No alerts yet today.</div>`;
 }
@@ -1241,7 +1287,7 @@ async function startRun() {
   const b = $("#startBtn"); b.disabled = true; b.textContent = "Starting…";
   const inputs = { request_token: t };
   if (mode === "backtest") inputs.days = String(Math.max(60, Math.min(400, +$("#btDays").value || 180)));
-  if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); }
+  if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); inputs.quiet_until = $("#quiet").value || "09:18"; }
   try {
     await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : mode === "backtest" ? "backtest.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
     $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : mode === "backtest" ? "Backtest started. Takes about 15–20 minutes." : "Day-end scan started. Takes about 4 minutes.");
@@ -1313,6 +1359,8 @@ document.addEventListener("click", e => {
   const jw = e.target.closest("[data-jw]"); if (jw) { S.jView = "week"; S.jAnchor = jw.dataset.jw; return renderJournal(); }
   const gb = e.target.closest("[data-go]"); if (gb) { go(gb.dataset.go); $("#setDetails").open = true; return; }
   const sy = e.target.closest("[data-sym]"); if (sy) return openChart(sy.dataset.sym);
+  const lo = e.target.closest("[data-lopt]"); if (lo) { const k = lo.dataset.lopt; S[k] = !S[k]; store.set(k, S[k] ? "1" : "0"); return renderLive(); }
+  if (e.target.closest("#copyTopic")) { const t = $("#topicSug").textContent; navigator.clipboard?.writeText(t).then(() => toast("Topic copied"), () => toast("Select the topic and copy it")); return; }
   const lf = e.target.closest("[data-lf]"); if (lf) { S.liveF = S.liveF === lf.dataset.lf ? null : lf.dataset.lf; return renderLive(); }
   const df = e.target.closest("[data-df]"); if (df) { S.dayF = S.dayF === df.dataset.df ? null : df.dataset.df; return renderDay(); }
   const wb = e.target.closest("#winSeg button"); if (wb) { S.win = wb.dataset.w; $$("#winSeg button").forEach(b => b.setAttribute("aria-pressed", b === wb)); return renderLive(); }
@@ -1351,7 +1399,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-23.1";
+const APP_VERSION = "2026-10-25.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1363,11 +1411,24 @@ async function checkUpdate() {
   } catch {}
 }
 
+/* ---------- deep link (#s=SYMBOL from phone alerts) ---------- */
+function deepLink() {
+  const m = location.hash.match(/^#s=([A-Za-z0-9&%._-]+)/);
+  if (m) { const sym = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname + location.search); S.iv = "1D"; openChart(sym); return true; }
+  return false;
+}
+window.addEventListener("hashchange", deepLink);
+{
+  let t = store.get("topic");
+  if (!t) { const a = new Uint8Array(6); (crypto.getRandomValues ? crypto.getRandomValues(a) : a); t = "turtle-" + [...a].map(x => x.toString(36).padStart(2, "0")).join("").slice(0, 10); store.set("topic", t); }
+  $("#topicSug").textContent = t;
+}
+
 /* ---------- boot ---------- */
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
 go(["live", "day", "chart", "journal", "run"].includes(S.tab) ? S.tab : "live");
-refresh(); checkUpdate();
+refresh(); checkUpdate(); deepLink();
 setInterval(() => { paintStatus(); if (document.visibilityState === "visible" && S.token && market().k !== "closed" && S.tab !== "run") refresh(); }, 30000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { checkUpdate(); if (S.token) refresh(); } });
 })();
