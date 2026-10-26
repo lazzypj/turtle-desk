@@ -528,7 +528,13 @@ function chgPill(v) { return v == null || !isFinite(v) ? ["–", "flat"] : [pct(
 function liveRows() {
   const L = S.live; if (!L) return [];
   const ws = S.win === "all" ? [55, 20] : [+S.win];
-  return L.rows.map(r => { const top = Math.max(...ws.map(w => r["s" + w] || 0)), w = ws.find(x => r["s" + x] === top) ?? ws[0]; return { ...r, vt: top, vw: w, vl: r["l" + w], g: r.side + top }; }).filter(r => r.vt > 0);
+  // Snapshots from before 25 Oct have no opening/gap tags: infer them from the alert log
+  // (first break of the day before the quiet time = opening move; gaps cannot be told apart there).
+  const quiet = L.quiet_until || "09:18", firstBrk = {};
+  if (!("quiet_until" in L)) for (const e of L._ev || L.events || []) if (e.status === "BREAKOUT") { const k = e.symbol + e.side; if (!firstBrk[k] || e.time < firstBrk[k]) firstBrk[k] = e.time; }
+  return L.rows.map(r => {
+    if (!("quiet_until" in L) && r.top === 2) { const t = firstBrk[r.symbol + r.side] || r.since; r = { ...r, opening: t < quiet, fresh: t >= quiet, brk_time: t }; }
+    const top = Math.max(...ws.map(w => r["s" + w] || 0)), w = ws.find(x => r["s" + x] === top) ?? ws[0]; return { ...r, vt: top, vw: w, vl: r["l" + w], g: r.side + top }; }).filter(r => r.vt > 0);
 }
 const GROUPS = { UP2: ["Breakouts", "UP"], UP1: ["Near breakout", "UP"], DOWN2: ["Breakdowns", "DOWN"], DOWN1: ["Near breakdown", "DOWN"] };
 function renderMarket() {
@@ -1327,6 +1333,9 @@ async function refresh() {
       if (S.sample) { S.sample = false; S.prices = null; S.oc = null; S.ocAt = 0; S.bars = {}; }
       const [lv, sm, sg] = await Promise.all([file("LIVE.json", "live"), file("data/summary.csv"), file("data/signals_latest.csv")]);
       try { S.live = lv ? JSON.parse(lv) : null; } catch { S.live = null; }
+      if (S.live && !("quiet_until" in S.live) && S.live.date) {   // older snapshot: get the full alert log for opening tags
+        try { S.live._ev = csv(await file(`data/intraday/events_${S.live.date}.csv`)); } catch { S.live._ev = null; }
+      }
       S.summary = csv(sm); S.signals = csv(sg); S.err = "";
     }
   } catch (e) { S.err = e.message; }
@@ -1400,7 +1409,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-26.1";
+const APP_VERSION = "2026-10-26.2";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
