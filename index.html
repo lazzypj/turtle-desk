@@ -1115,6 +1115,7 @@ function jPeriod() {
 }
 function renderJournal() {
   const el = $("#journalBody"); if (!el) return;
+  if (!S.journal && S.jErr) { el.innerHTML = `<div class="list"><div class="empty bad">Could not read the journal: ${esc(S.jErr)}</div></div>`; return; }
   if (!S.journal) { el.innerHTML = `<div class="list"><div class="empty">No journal yet. Your trades are saved automatically at the end of each live watch and by the day-end scan.</div></div>`; return; }
   const P = jPeriod(), st = jStats(P.trips);
   $$("#jViewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.jv === S.jView));
@@ -1161,7 +1162,7 @@ function renderJournal() {
     const ts = byDay[day], s2 = jStats(ts);
     html += `<div class="gh">${niceDate(day)} ${day.slice(0, 4)} <span class="${s2.net >= 0 ? "up" : "down"}" style="font-weight:700">${rupee(s2.net)}</span></div><div class="list">${ts.map(t => {
       const sig = t.signal === "after_break" ? `after break +${t.delay_min} min` : t.signal === "near" ? "near level, no break yet" : t.signal === "none" ? "no alert" : "watch off";
-      const name = `${t.underlying} ${t.strike ? fmt(t.strike, t.strike % 1 ? 1 : 0) : ""} ${t.opt || ""}`.trim();
+      const name = t.opt === "EQ" ? `${t.underlying} shares (${t.dir === "short" ? "short" : "long"})` : `${t.underlying} ${t.strike ? fmt(t.strike, t.strike % 1 ? 1 : 0) : ""} ${t.opt || ""}`.trim();
       return `<div class="cell" data-sym="${esc(t.underlying)}" role="button" tabindex="0"><div class="sym"><span class="mark ${t.opt === "PE" ? "DOWN" : "UP"}"></span><em>${esc(name)}</em></div><div class="px ${t.net >= 0 ? "up" : "down"}">${rupee(t.net)}</div>
         <div class="meta wrap">${(t.entry_time || "").slice(0, 5)} → ${(t.exit_time || "").slice(0, 5)} · ${t.hold_min != null ? Math.round(t.hold_min) + " min" : ""} · ${fmt(t.buy_avg)} → ${fmt(t.sell_avg)} · ${sig}</div>
         <div class="pill ${t.ret_pct > 0 ? "UP" : "DOWN"}">${pct(t.ret_pct, 1)}</div></div>`; }).join("")}</div>`;
@@ -1172,7 +1173,7 @@ function renderJournal() {
 }
 async function loadJournal() {
   if (!S.token) { S.journal = sampleJournal(); }
-  else { try { const t = await file("data/journal/journal.json"); S.journal = t ? JSON.parse(t) : null; } catch { S.journal = null; } }
+  else { try { const t = await file("data/journal/journal.json"); S.journal = t ? JSON.parse(t.replace(/\bNaN\b|-?Infinity\b/g, "null")) : null; S.jErr = ""; } catch (e) { S.journal = null; S.jErr = e.message; } }
   if (S.journal && !S.jDay) { const ds = (S.journal.trips || []).map(t => t.date).sort(); S.jDay = ds.at(-1) || null; if (S.jDay) S.jAnchor = S.jDay; }
   renderJournal();
 }
@@ -1409,7 +1410,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-26.2";
+const APP_VERSION = "2026-10-26.3";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
