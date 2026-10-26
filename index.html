@@ -383,6 +383,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       </div></div>
     </details>
     <p class="foot">Kite data is for your own use. Don’t save your token on a shared device.</p>
+    <p class="foot" id="verLine"></p>
   </section>
 </main>
 
@@ -1399,7 +1400,7 @@ new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect(
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-25.1";
+const APP_VERSION = "2026-10-26.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1426,6 +1427,7 @@ window.addEventListener("hashchange", deepLink);
 
 /* ---------- boot ---------- */
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
+$("#verLine").textContent = "App version " + APP_VERSION;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
 go(["live", "day", "chart", "journal", "run"].includes(S.tab) ? S.tab : "live");
 refresh(); checkUpdate(); deepLink();
