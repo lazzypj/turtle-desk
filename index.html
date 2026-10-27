@@ -246,6 +246,9 @@ body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
 .ta-levels .kv small { display: block; font-size: 11.5px; color: var(--ink3); }
 .ta-now span:nth-child(2) { color: var(--accent); }
 
+.lotmoney { width: 100%; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; font-weight: 600; padding-top: 4px; }
+.lotmoney span:first-child { color: var(--ink2); font-weight: 500; }
+
 /* live ticks pill */
 .tickpill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
 .tickpill.live { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
@@ -1281,6 +1284,20 @@ async function loadJournal() {
   renderJournal();
 }
 
+/* ---------- per-lot money for the target / stop rule ---------- */
+function lotCharges(prem, lot) {   // round trip, one lot, estimated Zerodha option charges
+  const v = prem * lot, brok = 40, exch = 0.0003503 * 2 * v, sebi = 2 * v / 1e7;
+  return brok + 0.001 * v + exch + sebi + 0.00003 * v + 0.18 * (brok + exch + sebi);
+}
+function lotMoney(prem, lot) {
+  if (!prem || !lot) return "";
+  const r = v => "₹" + Math.round(v).toLocaleString("en-IN"), ch = lotCharges(prem, lot);
+  return `<div class="lotmoney"><span>Per lot (${lot}):</span>
+    <span class="up">+${r(prem * lot * .2)} to +${r(prem * lot * .3)}</span>
+    <span class="down">−${r(prem * lot * .1)} to −${r(prem * lot * .15)}</span>
+    <span class="cap">charges ≈ ${r(ch)}</span></div>`;
+}
+
 /* ---------- expiries ---------- */
 // Snapshots hold the default expiry at the top level and any other expiries in "more".
 function chainExps(sym) {
@@ -1318,7 +1335,7 @@ function renderChainDesk(d) {
   const leg = (call ? d.c : d.p)[sel.i], k = d.k[sel.i];
   const rs = v => "₹" + fmt(v);
   const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${leg[4] != null && leg[5] != null ? ` <span class="cap">bid ${fmt(leg[4])} / ask ${fmt(leg[5])}</span>` : ""}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
-      <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>`
+      <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>${lotMoney(leg[0], d.lot)}`
     : `<b>${fmt(k, 0)} ${sel.side}</b> no trades in this strike`;
   const exps = chainExps(S.sym), today = dUTC(ist().date);
   const tabs = exps.length > 1 ? `<div class="seg exptabs" role="group" aria-label="Expiry">${exps.map(e => {
@@ -1530,7 +1547,7 @@ function renderOC() {
     return `<div class="opt">
       <div class="opt-top"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="opt-px">${rs(ltp)}</div></div>
       <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}${bid != null && ask != null ? ` · bid/ask ${fmt(bid)}/${fmt(ask)}` : ""}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
-      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>
+      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>${lotMoney(ltp, lot)}
     </div>`;
   }).join("");
   card.innerHTML = `<div class="opt-head">
@@ -1718,7 +1735,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-27.3";
+const APP_VERSION = "2026-10-27.4";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
