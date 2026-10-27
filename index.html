@@ -165,8 +165,17 @@ body.desk.mkt main { display: grid; grid-template-columns: 340px minmax(0, 1fr);
 body.desk.mkt main > #notice { display: none; }
 body.desk.mkt #s-live, body.desk.mkt #s-chart { display: block; max-width: none; margin: 0; padding-top: 0; min-height: 0; }
 body.desk.mkt #s-live { overflow-y: auto; padding-right: 4px; }
-body.desk.mkt #s-live .ttl { font-size: 22px; }
-body.desk.mkt #s-chart { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "chart side" "below side"; gap: 12px; height: 100%; }
+body.desk.mkt #s-live .ttl, body.desk.mkt #liveCap { display: none; }
+body.desk.mkt #mktCard { margin-top: 0; }
+.ixrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ixt { display: grid; gap: 1px; }
+.ixt small { font-size: 11px; font-weight: 700; color: var(--ink2); letter-spacing: .05em; }
+.ixt b { font-size: 22px; font-weight: 700; line-height: 1.15; }
+.ixt span { font-size: 13px; font-weight: 600; }
+.exptabs { margin: 10px 12px 2px; }
+.exptabs small { font-weight: 500; opacity: .7; margin-left: 3px; }
+body.desk.mkt #s-chart { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); grid-template-rows: minmax(0, 1fr); grid-template-areas: "chart side"; gap: 12px; height: 100%; }
+body.desk.mkt .ws-below { display: none !important; }
 body.desk.mkt .ws-chart { grid-area: chart; min-width: 0; }
 body.desk.mkt .ws-chart .card { margin-top: 8px !important; padding: 10px 12px; }
 body.desk.mkt .ws-chart .search { display: none; }
@@ -484,7 +493,7 @@ const store = {
   del(k) { try { localStorage.removeItem("td_" + k); } catch {} },
 };
 const BREADTH_H = 150;
-const chartH = () => S.desk && S.tab !== "day" ? Math.max(190, Math.min(640, window.innerHeight - 520)) : 280;
+const chartH = () => S.desk && S.tab !== "day" ? Math.max(220, Math.min(820, window.innerHeight - 300)) : 280;
 
 const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
@@ -614,8 +623,20 @@ function liveRows() {
     const top = Math.max(...ws.map(w => r["s" + w] || 0)), w = ws.find(x => r["s" + x] === top) ?? ws[0]; return { ...r, vt: top, vw: w, vl: r["l" + w], g: r.side + top }; }).filter(r => r.vt > 0);
 }
 const GROUPS = { UP2: ["Breakouts", "UP"], UP1: ["Near breakout", "UP"], DOWN2: ["Breakdowns", "DOWN"], DOWN1: ["Near breakdown", "DOWN"] };
+function idxLive(key, snap) {
+  const t = typeof tickFor === "function" ? tickFor(IDX_TOK[key]) : null;
+  if (t && t.close) return { ltp: t.ltp, chg: (t.ltp / t.close - 1) * 100, live: true };
+  return snap || null;
+}
 function renderMarket() {
-  const L = S.live, m = L?.market, el = $("#mktCard");
+  const L = S.live, el = $("#mktCard");
+  const m = { nifty: idxLive("nifty", L?.market?.nifty), banknifty: idxLive("banknifty", L?.market?.banknifty) };
+  if (S.desk) {
+    const tile = (name, x) => `<div class="ixt"><small>${name}${x?.live ? ' <span class="up">●</span>' : ""}</small><b class="${x ? (x.chg >= 0 ? "up" : "down") : ""}">${x ? fmt(x.ltp) : "–"}</b><span class="${x ? (x.chg >= 0 ? "up" : "down") : "cap"}">${x ? pct(x.chg) : "no data yet"}</span></div>`;
+    const all = L ? liveRows() : [], cnt = (side, fresh) => all.filter(r => r.side === side && r.vt === 2 && (!fresh || r.fresh)).length;
+    el.innerHTML = `<div class="ixrow">${tile("NIFTY 50", m.nifty)}${tile("BANK NIFTY", m.banknifty)}</div>${L ? `<div class="mkt-bias">Breaks <b class="up">▲${cnt("UP")}</b> <b class="down">▼${cnt("DOWN")}</b> · fresh <b class="up">▲${cnt("UP", true)}</b> <b class="down">▼${cnt("DOWN", true)}</b> · ${esc(liveState().k === "live" ? "watch running" : "watch not running")}</div>` : ""}`;
+    el.hidden = false; return;
+  }
   if (!L || !m || (!m.nifty && !m.banknifty)) { el.hidden = true; return; }
   const all = liveRows(), cnt = (side, fresh) => all.filter(r => r.side === side && r.vt === 2 && (!fresh || r.fresh)).length;
   const ix = (name, x) => x ? `<span><small>${name}</small> <b>${fmt(x.ltp, 0)}</b> <span class="${x.chg >= 0 ? "up" : "down"}" style="font-weight:600">${pct(x.chg)}</span></span>` : "";
@@ -1260,16 +1281,31 @@ async function loadJournal() {
   renderJournal();
 }
 
-/* ---------- DESKTOP: option chain (±10 strikes) ---------- */
+/* ---------- expiries ---------- */
+// Snapshots hold the default expiry at the top level and any other expiries in "more".
+function chainExps(sym) {
+  const b = S.oc?.stocks?.[sym]; if (!b) return [];
+  return [b, ...(b.more || [])].map(e => ({ ...e, spot: b.spot, utk: b.utk })).sort((x, y) => String(x.exp).localeCompare(String(y.exp)));
+}
+function chainFor(sym) {
+  const ex = chainExps(sym); if (!ex.length) return null;
+  const want = (S.expSel || {})[sym], def = S.oc.stocks[sym].exp;
+  return ex.find(e => e.exp === want) || ex.find(e => e.exp === def) || ex[0];
+}
+
+/* ---------- DESKTOP: option chain (±5 strikes, expiry tabs) ---------- */
 function renderChainDesk(d) {
   const card = $("#ocCard"), bias = biasFor(S.sym);
   const ai = d.k.indexOf(d.atm);
-  if (S.chainFor !== S.sym) { S.chainFor = S.sym; S.chainSel = { side: bias || "CE", i: ai }; }
+  const key = S.sym + "|" + d.exp;
+  if (S.chainFor !== key) { S.chainFor = key; S.chainSel = { side: (S.chainSel && S.chainSel.sym === S.sym ? S.chainSel.side : bias) || "CE", i: ai, sym: S.sym }; }
+  const lo = Math.max(0, ai - 5), hi = Math.min(d.k.length - 1, ai + 5);
   const sel = S.chainSel, call = sel.side === "CE";
   const maxOI = Math.max(1, ...d.c.map(x => x?.[1] || 0), ...d.p.map(x => x?.[1] || 0));
   const spotIdx = d.k.findIndex(k => k > d.spot);
   const w = x => `--w:${Math.round(((x?.[1] || 0) / maxOI) * 100)}%`;
   const rows = d.k.map((k, i) => {
+    if (i < lo || i > hi) return "";
     const c = d.c[i], p = d.p[i], citm = k < d.spot ? " itm" : "", pitm = k > d.spot ? " itm" : "";
     const sc = sel.i === i && call ? " pick" : "", sp = sel.i === i && !call ? " pick" : "";
     return `<tr class="${k === d.atm ? "atm" : ""}${i === spotIdx ? " spot" : ""}">
@@ -1284,7 +1320,11 @@ function renderChainDesk(d) {
   const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${leg[4] != null && leg[5] != null ? ` <span class="cap">bid ${fmt(leg[4])} / ask ${fmt(leg[5])}</span>` : ""}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
       <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>`
     : `<b>${fmt(k, 0)} ${sel.side}</b> no trades in this strike`;
-  card.innerHTML = `<div class="ocsum">
+  const exps = chainExps(S.sym), today = dUTC(ist().date);
+  const tabs = exps.length > 1 ? `<div class="seg exptabs" role="group" aria-label="Expiry">${exps.map(e => {
+    const dd = e.exp === "sample" ? "" : Math.round((dUTC(e.exp) - today) / 864e5);
+    return `<button data-exp="${esc(e.exp)}" aria-pressed="${e.exp === d.exp}">${e.exp === "sample" ? "Sample" : niceDate(e.exp)}${dd !== "" ? ` <small>${dd}d</small>` : ""}</button>`; }).join("")}</div>` : "";
+  card.innerHTML = `${tabs}<div class="ocsum">
       <div><b>${d.exp === "sample" ? "Sample" : niceDate(d.exp)}</b><small>Expiry · lot ${d.lot ?? "–"}</small></div>
       <div><b class="${d.pcr >= 1 ? "up" : d.pcr ? "down" : ""}">${d.pcr != null ? d.pcr.toFixed(2) : "–"}</b><small>PCR (OI)</small></div>
       <div><b>${d.mp != null ? fmt(d.mp, 0) : "–"}</b><small>Max pain</small></div>
@@ -1345,8 +1385,9 @@ function parseTicks(buf) {
   return out;
 }
 function tkSend(o) { try { TK.ws?.readyState === 1 && TK.ws.send(JSON.stringify(o)); } catch {} }
+const IDX_TOK = { nifty: 256265, banknifty: 260105 };
 function tkWanted(sym) {
-  const d = S.oc?.stocks?.[sym]; const set = new Set();
+  const d = chainFor(sym); const set = new Set(Object.values(IDX_TOK));
   if (!d) return set;
   if (d.utk) set.add(d.utk);
   (d.tk || []).forEach(([c, p]) => { if (c) set.add(c); if (p) set.add(p); });
@@ -1362,7 +1403,7 @@ function tkResubscribe() {
 async function ensureTicks(sym) {
   TK.sym = sym;
   if (!(await tkCredentials())) return;
-  if (!tkWanted(sym).size) { tkSet("wait", "No instrument list yet for ticks; it comes with the next option snapshot"); return; }
+  if (tkWanted(sym).size <= 2 && !chainFor(sym)?.utk) { tkSet("wait", "No instrument list yet for ticks; it comes with the next option snapshot"); }
   if (TK.ws && (TK.ws.readyState === 0 || TK.ws.readyState === 1)) { tkResubscribe(); return; }
   tkConnect();
 }
@@ -1394,6 +1435,7 @@ function tkSchedule() {
   if (tkRender) return;
   tkRender = setTimeout(() => {
     tkRender = 0;
+    if (document.body.classList.contains("mkt")) renderMarket();
     if (S.tab !== "chart" && !document.body.classList.contains("mkt")) return;
     renderOC();
     if (Date.now() - tkChartAt > 1000) { tkChartAt = Date.now(); drawChart(); }
@@ -1462,7 +1504,7 @@ function biasFor(sym) {
   return null;
 }
 function renderOC() {
-  const card = $("#ocCard"), d0 = S.oc?.stocks?.[S.sym], d = d0 ? liveChain(d0) : null;
+  const card = $("#ocCard"), d0 = chainFor(S.sym), d = d0 ? liveChain(d0) : null;
   if (!d) {
     $("#ocAsOf").textContent = "";
     card.innerHTML = `<div class="empty">${S.oc ? `No option data for ${esc(S.sym)} yet.` : "No option data saved yet."} It is saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
@@ -1612,6 +1654,7 @@ function toast(msg, ms = 3500) { $$(".toast").forEach(t => t.remove()); const t 
 document.addEventListener("click", e => {
   const tb = e.target.closest(".tabs button"); if (tb) return go(tb.dataset.tab);
   if (e.target.closest("#deskBtn")) { S.desk = !S.desk; store.set("desk", S.desk ? "1" : "0"); applyDesk(); paintChartControls(); go(S.tab === "chart" && S.desk ? "live" : S.tab); renderLive(); renderOC(); requestAnimationFrame(() => drawChart()); return; }
+  const ext = e.target.closest("[data-exp]"); if (ext) { S.expSel = { ...(S.expSel || {}), [S.sym]: ext.dataset.exp }; renderOC(); tkResubscribe(); return; }
   const chp = e.target.closest("[data-ch]"); if (chp) { const [side, i] = chp.dataset.ch.split(":"); S.chainSel = { side, i: +i }; return renderOC(); }
   const jv = e.target.closest("#jViewSeg button"); if (jv) { S.jView = jv.dataset.jv; return renderJournal(); }
   const jn = e.target.closest("#jPrev, #jNext"); if (jn) { const dir = jn.id === "jNext" ? 1 : -1;
@@ -1675,7 +1718,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-27.2";
+const APP_VERSION = "2026-10-27.3";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
