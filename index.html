@@ -138,6 +138,56 @@ canvas { display: block; touch-action: pan-y; }
 .search input { border: 0; background: none; padding: 9px 0; font-size: 16px; flex: 1; min-width: 0; outline: none; text-transform: uppercase; }
 .search input::placeholder { text-transform: none; color: var(--ink3); }
 
+/* stock page order on phones: chart, reading, levels, options */
+#s-chart.on { display: flex; flex-direction: column; }
+.ws-chart { order: 1; } .ws-below { order: 2; } .ws-side { order: 3; }
+.cell.sel { background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.chain-rule { padding: 10px 14px; border-bottom: .5px solid var(--sep); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.chain-rule .cap { width: 100%; font-size: 11.5px; }
+.octbl td[data-ch] { cursor: pointer; }
+.octbl td.pick { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* ---------- desktop view ---------- */
+body.desk { padding-bottom: 0; }
+body.desk .bar .wrap, body.desk main { max-width: none; }
+body.desk .bar .wrap { padding-right: 16px; }
+body.desk .tabs { top: env(safe-area-inset-top, 0px); bottom: auto; left: 230px; right: 104px; background: transparent; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; z-index: 26; }
+body.desk .tabs .in { height: 52px; max-width: none; display: flex; justify-content: center; gap: 4px; }
+body.desk .tabs button { grid-auto-flow: column; gap: 6px; padding: 0 14px; font-size: 13px; border-radius: 8px; height: 36px; align-self: center; }
+body.desk .tabs button[aria-current="page"] { background: var(--fill); }
+body.desk .tabs svg { width: 18px; height: 18px; }
+body.desk .tabs button[data-tab="chart"] { display: none; }
+body.desk .toast { bottom: 20px; }
+body.desk main > section { max-width: 980px; margin: 0 auto; }
+html.mkt, body.desk.mkt { overflow: hidden; height: 100%; }
+body.desk.mkt { padding-top: 0 !important; margin: 0; }
+body.desk.mkt main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; height: calc(100vh - 53px - env(safe-area-inset-top, 0px)); padding-block: 10px; overflow: hidden; }
+body.desk.mkt main > #notice { display: none; }
+body.desk.mkt #s-live, body.desk.mkt #s-chart { display: block; max-width: none; margin: 0; padding-top: 0; min-height: 0; }
+body.desk.mkt #s-live { overflow-y: auto; padding-right: 4px; }
+body.desk.mkt #s-live .ttl { font-size: 22px; }
+body.desk.mkt #s-chart { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "chart side" "below side"; gap: 12px; height: 100%; }
+body.desk.mkt .ws-chart { grid-area: chart; min-width: 0; }
+body.desk.mkt .ws-chart .card { margin-top: 8px !important; padding: 10px 12px; }
+body.desk.mkt .ws-chart .search { display: none; }
+body.desk.mkt .ws-chart .big { font-size: 24px; }
+body.desk.mkt .ws-chart .readout { margin: 6px 0 4px; min-height: 0; }
+body.desk.mkt .ws-chart .chips { margin-top: 8px; }
+body.desk.mkt .ws-below { grid-area: below; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
+body.desk.mkt .ws-read, body.desk.mkt .ws-levels { min-height: 0; overflow-y: auto; }
+body.desk.mkt .ws-side { grid-area: side; min-height: 0; overflow-y: auto; }
+body.desk.mkt .gh { margin: 2px 4px 6px; }
+body.desk.mkt .ta-notes { font-size: 12.5px; gap: 3px; line-height: 1.35; margin: 4px 0; }
+body.desk.mkt .ta-head { padding: 8px 12px 0; }
+body.desk.mkt #taCard .ocfoot { display: none; }
+body.desk.mkt .ta-levels { display: none; }
+body.desk.mkt .octbl td { padding: 3px 6px; font-size: 12px; }
+body.desk.mkt .octbl td small { display: inline; margin-left: 4px; }
+body.desk.mkt .octbl th { padding: 6px 6px 4px; }
+body.desk.mkt .ocsum { padding: 8px 6px; }
+body.desk.mkt .kv { padding: 7px 12px; }
+body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
+
 /* chart controls */
 .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 12px -14px 0; padding: 0 14px; }
 .chips::-webkit-scrollbar { display: none; }
@@ -149,7 +199,7 @@ canvas { display: block; touch-action: pan-y; }
 .readout { white-space: normal; min-height: 36px; line-height: 1.45; }
 
 /* market strip */
-.mkt { margin-top: 12px; background: var(--card); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
+.mktbar { margin-top: 12px; background: var(--card); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
 .mkt-row { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: baseline; font-size: 14px; }
 .mkt-row b { font-size: 15px; } .mkt-row small { font-size: 12px; color: var(--ink2); font-weight: 600; letter-spacing: .02em; }
 .mkt-bias { font-size: 13px; color: var(--ink2); }
@@ -263,6 +313,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <h1>Turtle Desk</h1>
     <div class="status"><span class="dot" id="mDot"></span><span id="mTxt">NSE</span></div>
   </div>
+  <button class="round" id="deskBtn" aria-label="Switch to desktop view" title="Desktop / phone view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
   <button class="round" id="refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
 </div></header>
 
@@ -272,7 +323,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
   <section id="s-live" class="on" aria-label="Live">
     <div class="ttl">Live</div>
     <div class="cap" id="liveCap">No live run yet</div>
-    <div class="mkt" id="mktCard" hidden></div>
+    <div class="mktbar" id="mktCard" hidden></div>
     <div class="seg" id="winSeg" role="group" aria-label="Window" style="margin-top:12px">
       <button data-w="all" aria-pressed="true">20D + 55D</button><button data-w="55" aria-pressed="false">55D only</button><button data-w="20" aria-pressed="false">20D only</button>
     </div>
@@ -296,6 +347,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
   </section>
 
   <section id="s-chart" aria-label="Stock">
+   <div class="ws-chart">
     <form class="search" id="symForm" role="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
       <input id="symInput" list="symList" placeholder="Search stock" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="search">
@@ -312,12 +364,17 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       <div class="cbox" id="pcBox"><canvas id="pc" aria-label="Candlestick chart"></canvas></div>
       <div class="crow"><div class="legend" id="cLegend" style="margin:0"></div><div class="seg" id="rangeRow" role="group" aria-label="Range" style="width:132px"><span id="rangeSeg" style="display:contents"><button data-n="60">3M</button><button data-n="120">6M</button><button data-n="250">1Y</button></span></div></div>
     </div>
-    <div class="gh">What the chart says <span>daily</span></div>
-    <div class="card" id="taCard" style="padding:0"></div>
-    <div class="gh">Turtle levels for the next session</div>
-    <div class="list" id="cLevels"></div>
+   </div>
+   <div class="ws-below">
+    <div class="ws-read"><div class="gh">What the chart says <span>daily</span></div>
+    <div class="card" id="taCard" style="padding:0"></div></div>
+    <div class="ws-levels"><div class="gh">Turtle levels for the next session</div>
+    <div class="list" id="cLevels"></div></div>
+   </div>
+   <div class="ws-side">
     <div class="gh">Options <span id="ocAsOf"></span></div>
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
+   </div>
   </section>
 
   <section id="s-journal" aria-label="Journal">
@@ -408,7 +465,8 @@ const store = {
   set(k, v) { try { localStorage.setItem("td_" + k, v); } catch {} },
   del(k) { try { localStorage.removeItem("td_" + k); } catch {} },
 };
-const CHART_H = 280, BREADTH_H = 150;
+const BREADTH_H = 150;
+const chartH = () => S.desk && S.tab !== "day" ? Math.max(190, Math.min(640, window.innerHeight - 520)) : 280;
 
 const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
@@ -416,7 +474,8 @@ const S = {
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
   brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1",
   jView: "month", jAnchor: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), jDay: null, journal: null,
-  sym: store.get("sym", ""), n: +store.get("n", "120") || 120, iv: store.get("iv", "1D"), mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
+  sym: store.get("sym", ""), n: +store.get("n", "120") || 120, desk: store.get("desk", "") ? store.get("desk") === "1" : window.innerWidth >= 1200,
+  iv: "1D", mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
 };
 
 /* ---------- time ---------- */
@@ -518,7 +577,7 @@ function notice() {
 
 /* ---------- rows ---------- */
 function cell({ sym, side, hollow, meta, px, pill, pillCls }) {
-  return `<div class="cell" data-sym="${esc(sym)}" role="button" tabindex="0">
+  return `<div class="cell${S.desk && sym === S.sym ? " sel" : ""}" data-sym="${esc(sym)}" role="button" tabindex="0">
     <div class="sym"><span class="mark ${side}${hollow ? " hollow" : ""}"></span><em>${esc(sym)}</em></div><div class="px">${px}</div>
     <div class="meta">${meta}</div><div class="pill ${pillCls}">${pill}</div></div>`;
 }
@@ -618,7 +677,7 @@ const tok = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 function sizeCanvas(cv, box, h) {
   const w = Math.floor(box.getBoundingClientRect().width); if (!w) return null;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
-  if (cv._w !== w || cv._dpr !== dpr) { cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px"; cv._w = w; cv._dpr = dpr; }
+  if (cv._w !== w || cv._dpr !== dpr || cv._h !== h) { cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px"; cv._w = w; cv._dpr = dpr; cv._h = h; }
   const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   g.font = `500 10.5px ${tok("--font")}`; return { g, w, h };
 }
@@ -671,6 +730,7 @@ async function openChart(sym) {
     else $("#chartMsg").textContent = "";
     $("#symInput").value = ""; $("#symInput").placeholder = "Search stock · showing " + S.sym;
     paintChartControls(); drawChart(); showOC();
+    if (S.desk) renderLive();
     const sym0 = S.sym; await ensureBars(sym0); if (S.sym === sym0) drawChart();
   } catch (e) { $("#chartMsg").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
 }
@@ -727,7 +787,7 @@ function drawChart() {
   const se = S.prices?.get(S.sym); if (!se) return;
   const lr = liveRow(), ltp = lr?.ltp;
   headerAndLevels(se, lr);
-  const c = sizeCanvas($("#pc"), $("#pcBox"), CHART_H); if (!c) return;
+  const c = sizeCanvas($("#pc"), $("#pcBox"), chartH()); if (!c) return;
   const { g, w, h } = c, daily = S.iv === "1D", step = { "1m": 1, "5m": 5, "15m": 15 }[S.iv];
   const series = daily ? dailySeries(se, lr) : intradaySeries(step);
   const ink2 = tok("--ink2"), ink3 = tok("--ink3"), sep = tok("--sep"), acc = tok("--accent"), up = tok("--up"), dn = tok("--down"), amb = tok("--amber");
@@ -1178,6 +1238,42 @@ async function loadJournal() {
   renderJournal();
 }
 
+/* ---------- DESKTOP: option chain (±10 strikes) ---------- */
+function renderChainDesk(d) {
+  const card = $("#ocCard"), bias = biasFor(S.sym);
+  const ai = d.k.indexOf(d.atm);
+  if (S.chainFor !== S.sym) { S.chainFor = S.sym; S.chainSel = { side: bias || "CE", i: ai }; }
+  const sel = S.chainSel, call = sel.side === "CE";
+  const maxOI = Math.max(1, ...d.c.map(x => x?.[1] || 0), ...d.p.map(x => x?.[1] || 0));
+  const spotIdx = d.k.findIndex(k => k > d.spot);
+  const w = x => `--w:${Math.round(((x?.[1] || 0) / maxOI) * 100)}%`;
+  const rows = d.k.map((k, i) => {
+    const c = d.c[i], p = d.p[i], citm = k < d.spot ? " itm" : "", pitm = k > d.spot ? " itm" : "";
+    const sc = sel.i === i && call ? " pick" : "", sp = sel.i === i && !call ? " pick" : "";
+    return `<tr class="${k === d.atm ? "atm" : ""}${i === spotIdx ? " spot" : ""}">
+      <td class="co${citm}${sc}" style="${w(c)}" data-ch="CE:${i}">${big(c?.[1])}</td>
+      <td class="${citm.trim()}${sc}" data-ch="CE:${i}">${c ? fmt(c[0]) : "–"}<small>${c?.[2] != null ? c[2] + "%" : "–"}</small></td>
+      <td class="k">${fmt(k, k % 1 ? 1 : 0)}</td>
+      <td class="pl${pitm}${sp}" data-ch="PE:${i}">${p ? fmt(p[0]) : "–"}<small>${p?.[2] != null ? p[2] + "%" : "–"}</small></td>
+      <td class="po${pitm}${sp}" style="${w(p)}" data-ch="PE:${i}">${big(p?.[1])}</td></tr>`;
+  }).join("");
+  const leg = (call ? d.c : d.p)[sel.i], k = d.k[sel.i];
+  const rs = v => "₹" + fmt(v);
+  const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
+      <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>`
+    : `<b>${fmt(k, 0)} ${sel.side}</b> no trades in this strike`;
+  card.innerHTML = `<div class="ocsum">
+      <div><b>${d.exp === "sample" ? "Sample" : niceDate(d.exp)}</b><small>Expiry · lot ${d.lot ?? "–"}</small></div>
+      <div><b class="${d.pcr >= 1 ? "up" : d.pcr ? "down" : ""}">${d.pcr != null ? d.pcr.toFixed(2) : "–"}</b><small>PCR (OI)</small></div>
+      <div><b>${d.mp != null ? fmt(d.mp, 0) : "–"}</b><small>Max pain</small></div>
+      <div><b>${d.iv != null ? d.iv + "%" : "–"}</b><small>ATM IV</small></div></div>
+    <div class="chain-rule">${rule}<div class="cap">${bias ? `Signal: ${bias === "CE" ? "breakout → calls" : "breakdown → puts"} · ` : ""}tap a price to pick a strike</div></div>
+    <table class="octbl"><thead><tr><th class="side" colspan="2" style="text-align:right">Calls</th><th>Strike</th><th class="side" colspan="2" style="text-align:left">Puts</th></tr>
+      <tr><th style="text-align:right">OI</th><th style="text-align:right">LTP · IV</th><th></th><th style="text-align:left">LTP · IV</th><th style="text-align:left">OI</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <div class="ocfoot">Spot ${fmt(d.spot)} when captured (amber line). Shaded = in the money. Target/stop use your 20–30% / 10–15% rule.</div>`;
+}
+
 /* ---------- OPTION CHAIN ---------- */
 function ncdf(x) { const t = 1 / (1 + .2316419 * Math.abs(x)), d = .3989423 * Math.exp(-x * x / 2), p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
 function bs(s, k, t, r, v, call) { const sq = v * Math.sqrt(t), d1 = (Math.log(s / k) + (r + v * v / 2) * t) / sq, d2 = d1 - sq; return call ? s * ncdf(d1) - k * Math.exp(-r * t) * ncdf(d2) : k * Math.exp(-r * t) * ncdf(-d2) - s * ncdf(-d1); }
@@ -1222,6 +1318,7 @@ function renderOC() {
     card.innerHTML = `<div class="empty">${S.oc ? `No option data for ${esc(S.sym)} yet.` : "No option data saved yet."} It is saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
     return;
   }
+  if (S.desk) { const up2 = ist(new Date(S.oc.updated)); $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up2.date === ist().date ? "" : niceDate(up2.date) + " "}${up2.hm}`; return renderChainDesk(d); }
   const bias = biasFor(S.sym);
   if (!S.ocSideFor || S.ocSideFor !== S.sym) { S.ocSide = bias || "CE"; S.ocSideFor = S.sym; }
   const side = S.ocSide, call = side === "CE", ai = d.k.indexOf(d.atm);
@@ -1349,9 +1446,12 @@ async function refresh() {
 /* ---------- nav ---------- */
 function go(tab, fromChart = false) {
   S.tab = tab; store.set("tab", tab);
-  $$("main > section").forEach(s => s.classList.toggle("on", s.id === "s-" + tab));
-  $$(".tabs button").forEach(b => b.dataset.tab === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  const mkt = S.desk && (tab === "live" || tab === "chart");
+  document.body.classList.toggle("mkt", mkt); document.documentElement.classList.toggle("mkt", mkt);
+  $$("main > section").forEach(s => s.classList.toggle("on", s.id === "s-" + tab || (mkt && (s.id === "s-live" || s.id === "s-chart"))));
+  $$(".tabs button").forEach(b => (b.dataset.tab === tab || (mkt && b.dataset.tab === "live")) ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   window.scrollTo(0, 0);
+  if (mkt && tab === "live" && !fromChart) { openChart(); }
   if (tab === "day") drawBreadth();
   if (tab === "chart" && !fromChart) openChart();
   if (tab === "run") loadRuns();
@@ -1361,6 +1461,8 @@ function toast(msg, ms = 3500) { $$(".toast").forEach(t => t.remove()); const t 
 
 document.addEventListener("click", e => {
   const tb = e.target.closest(".tabs button"); if (tb) return go(tb.dataset.tab);
+  if (e.target.closest("#deskBtn")) { S.desk = !S.desk; store.set("desk", S.desk ? "1" : "0"); applyDesk(); paintChartControls(); go(S.tab === "chart" && S.desk ? "live" : S.tab); renderLive(); renderOC(); requestAnimationFrame(() => drawChart()); return; }
+  const chp = e.target.closest("[data-ch]"); if (chp) { const [side, i] = chp.dataset.ch.split(":"); S.chainSel = { side, i: +i }; return renderOC(); }
   const jv = e.target.closest("#jViewSeg button"); if (jv) { S.jView = jv.dataset.jv; return renderJournal(); }
   const jn = e.target.closest("#jPrev, #jNext"); if (jn) { const dir = jn.id === "jNext" ? 1 : -1;
     if (S.jView === "week") S.jAnchor = addDays(S.jAnchor, 7 * dir);
@@ -1376,7 +1478,7 @@ document.addEventListener("click", e => {
   const df = e.target.closest("[data-df]"); if (df) { S.dayF = S.dayF === df.dataset.df ? null : df.dataset.df; return renderDay(); }
   const wb = e.target.closest("#winSeg button"); if (wb) { S.win = wb.dataset.w; $$("#winSeg button").forEach(b => b.setAttribute("aria-pressed", b === wb)); return renderLive(); }
   const rb = e.target.closest("#rangeSeg button"); if (rb) { S.n = +rb.dataset.n; store.set("n", S.n); S.hover = null; paintChartControls(); return drawChart(); }
-  const ib = e.target.closest("#ivSeg button"); if (ib) { S.iv = ib.dataset.iv; store.set("iv", S.iv); S.hover = null; paintChartControls(); drawChart(); if (S.iv !== "1D") ensureBars(S.sym).then(() => drawChart()); return; }
+  const ib = e.target.closest("#ivSeg button"); if (ib) { S.iv = ib.dataset.iv; store.set(S.desk ? "ivDesk" : "iv", S.iv); S.hover = null; paintChartControls(); drawChart(); if (S.iv !== "1D") ensureBars(S.sym).then(() => drawChart()); return; }
   const mc = e.target.closest("[data-ma]"); if (mc) { const k = mc.dataset.ma; S.mas = S.mas.includes(k) ? S.mas.filter(x => x !== k) : [...S.mas, k]; store.set("mas", S.mas.join(",")); paintChartControls(); return drawChart(); }
   const os = e.target.closest("[data-oside]"); if (os) { S.ocSide = os.dataset.oside; return renderOC(); }
   const oc2 = e.target.closest("[data-opt]"); if (oc2) { const k = oc2.dataset.opt; S[k] = !S[k]; store.set(k, S[k] ? "1" : "0"); paintChartControls(); return drawChart(); }
@@ -1406,11 +1508,23 @@ $("#forget").addEventListener("click", () => { S.token = ""; store.del("token");
 
 // Redraw charts only when their width really changes (iOS fires resize while scrolling as the address bar moves).
 let lastW = 0;
-new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect().width); if (w === lastW) return; lastW = w; if (S.tab === "day") drawBreadth(); if (S.tab === "chart") drawChart(); }).observe($("main"));
+new ResizeObserver(() => { const w = Math.floor($("main").getBoundingClientRect().width); if (w === lastW) return; lastW = w; if (S.tab === "day") drawBreadth(); if (S.tab === "chart" || document.body.classList.contains("mkt")) drawChart(); }).observe($("main"));
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { drawBreadth(); drawChart(); });
 
+/* ---------- desktop view ---------- */
+function applyDesk() {
+  document.body.classList.toggle("desk", S.desk);
+  S.iv = store.get(S.desk ? "ivDesk" : "iv", S.desk ? "5m" : "1D");
+  $("#deskBtn").setAttribute("aria-label", S.desk ? "Switch to phone view" : "Switch to desktop view");
+  $("#deskBtn").innerHTML = S.desk
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>`;
+}
+let deskT;
+window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
+
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-26.3";
+const APP_VERSION = "2026-10-27.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1436,6 +1550,7 @@ window.addEventListener("hashchange", deepLink);
 }
 
 /* ---------- boot ---------- */
+applyDesk();
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 $("#verLine").textContent = "App version " + APP_VERSION;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
