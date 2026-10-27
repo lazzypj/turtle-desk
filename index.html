@@ -237,6 +237,13 @@ body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
 .ta-levels .kv small { display: block; font-size: 11.5px; color: var(--ink3); }
 .ta-now span:nth-child(2) { color: var(--accent); }
 
+/* live ticks pill */
+.tickpill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
+.tickpill.live { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.tickpill.live::before { content: "● "; animation: pulse 2s ease-in-out infinite; }
+.tickpill.wait, .tickpill.off { color: var(--ink2); background: var(--fill); }
+.tickpill.err { color: var(--down); background: color-mix(in srgb, var(--down) 12%, transparent); }
+
 /* options */
 .opt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 4px; flex-wrap: wrap; }
 .opt { padding: 12px 14px; display: grid; gap: 5px; position: relative; }
@@ -372,7 +379,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <div class="list" id="cLevels"></div></div>
    </div>
    <div class="ws-side">
-    <div class="gh">Options <span id="ocAsOf"></span></div>
+    <div class="gh">Options <span><span id="tickPill" class="tickpill" hidden></span> <span id="ocAsOf"></span></span></div>
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
    </div>
   </section>
@@ -423,9 +430,20 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       <form id="setForm">
         <div class="frow"><label for="ghToken">GitHub token</label><input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…"><div class="hint">Fine-grained, Turtle-strategy only. Actions: Read and write. Contents: Read. Saved only on this phone.</div></div>
         <div class="frow"><label for="repo">Repository</label><input type="text" id="repo" value="lazzypj/Turtle-strategy" autocapitalize="off" spellcheck="false"></div>
+        <div class="frow"><label for="tickPin">Live ticks PIN</label><input type="password" id="tickPin" autocomplete="off" inputmode="numeric" placeholder="same as your TICK_PIN secret"><div class="hint">Saved only on this device. See “Live ticks” below.</div></div>
         <div class="frow"><label for="apiKey">Kite API key</label><input type="text" id="apiKey" autocapitalize="off" spellcheck="false" placeholder="api_key, not the secret"></div>
         <div class="frow"><button class="btn primary" type="submit">Save and connect</button><button class="btn" type="button" id="forget">Forget token</button><div class="hint" id="setState"></div></div>
       </form>
+    </details>
+    <div class="gh">Live ticks</div>
+    <details class="list" id="tickHelp">
+      <summary><span id="tickHelpSum">Turn on tick-by-tick option prices</span><span class="chev">›</span></summary>
+      <div class="frow"><div class="hint" style="font-size:13.5px;line-height:1.5">
+        1. Pick a PIN of 6 or more digits.<br>
+        2. In GitHub: Turtle-strategy › Settings › Secrets and variables › Actions › New repository secret. Name <b>TICK_PIN</b>, value: your PIN.<br>
+        3. Enter the same PIN above in Connection › Live ticks PIN, then Save.<br>
+        Each live watch then hands today's Kite login to this app, encrypted with your PIN. The stock you open streams its price and its option chain tick by tick, all day while the app is open, even after the watch ends. The login expires early next morning.
+      </div></div>
     </details>
     <div class="gh">Phone alerts</div>
     <details class="list" id="alertHelp">
@@ -761,7 +779,11 @@ function intradaySeries(step) {
     if (cur) out.push(cur); }
   return out;
 }
-function liveRow() { return S.live?.date === ist().date ? S.live.rows.find(r => r.symbol === S.sym) : null; }
+function liveRow() {
+  const r = S.live?.date === ist().date ? S.live.rows.find(x => x.symbol === S.sym) : null;
+  const t = tickPriceFor(S.sym); if (!t) return r;
+  return { ...(r || { symbol: S.sym }), ltp: t.ltp, chg: t.close ? (t.ltp / t.close - 1) * 100 : r?.chg };
+}
 function dailySeries(se, lr) {
   const out = se.map(d => ({ d: d.date, m: null, o: d.open, h: d.high, l: d.low, c: d.close, v: d.volume }));
   const b = S.bars[S.sym]?.data;
@@ -1259,7 +1281,7 @@ function renderChainDesk(d) {
   }).join("");
   const leg = (call ? d.c : d.p)[sel.i], k = d.k[sel.i];
   const rs = v => "₹" + fmt(v);
-  const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
+  const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${leg[4] != null && leg[5] != null ? ` <span class="cap">bid ${fmt(leg[4])} / ask ${fmt(leg[5])}</span>` : ""}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
       <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>`
     : `<b>${fmt(k, 0)} ${sel.side}</b> no trades in this strike`;
   card.innerHTML = `<div class="ocsum">
@@ -1273,6 +1295,134 @@ function renderChainDesk(d) {
       <tbody>${rows}</tbody></table>
     <div class="ocfoot">Spot ${fmt(d.spot)} when captured (amber line). Shaded = in the money. Target/stop use your 20–30% / 10–15% rule.</div>`;
 }
+
+/* ---------- LIVE TICKS (Kite WebSocket, straight from the browser) ---------- */
+const TK = { ws: null, status: "off", msg: "", token: null, apiKey: null, date: null, subs: new Set(), data: new Map(), tries: 0, opened: false, sym: null, timer: null, last: 0 };
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function tkDecrypt(blob, pin) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(blob.salt), iterations: blob.rounds || 200000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(blob.iv) }, key, b64(blob.ct));
+  return new TextDecoder().decode(pt);
+}
+function tkSet(status, msg = "") { TK.status = status; TK.msg = msg; paintTickPill(); }
+function paintTickPill() {
+  const el = $("#tickPill"); if (!el) return;
+  const map = { live: ["live", "Live ticks"], connecting: ["wait", "Connecting ticks…"], off: ["off", ""], error: ["err", TK.msg || "Ticks unavailable"], wait: ["off", TK.msg] };
+  const [cls, txt] = map[TK.status] || map.off;
+  el.className = "tickpill " + cls; el.textContent = txt; el.hidden = !txt;
+}
+async function tkCredentials() {
+  const pin = store.get("tickPin"); if (!pin || !S.token) { tkSet("off"); return false; }
+  const today = ist().date;
+  if (TK.token && TK.date === today) return true;
+  let blob = null;
+  try { const t = await file("TK.json", "live"); blob = t ? JSON.parse(t) : null; } catch { blob = null; }
+  if (!blob) { tkSet("wait", "Ticks start after a live-watch login"); return false; }
+  if (blob.date !== today) { tkSet("wait", "Ticks start after today's live-watch login"); return false; }
+  try { TK.token = await tkDecrypt(blob, pin); TK.apiKey = blob.api_key || S.apiKey; TK.date = blob.date; return true; }
+  catch { tkSet("error", "Ticks PIN doesn't match the TICK_PIN secret"); return false; }
+}
+function parseTicks(buf) {
+  const out = []; if (buf.byteLength < 2) return out;
+  const dv = new DataView(buf); const n = dv.getInt16(0); let off = 2;
+  for (let i = 0; i < n && off + 2 <= buf.byteLength; i++) {
+    const len = dv.getInt16(off); off += 2; if (off + len > buf.byteLength) break;
+    const p = new DataView(buf, off, len); off += len;
+    const token = p.getUint32(0), seg = token & 0xff, div = seg === 3 ? 1e7 : seg === 6 ? 1e4 : 100;
+    const t = { token, ltp: p.getInt32(4) / div };
+    if (len === 28 || len === 32) { t.close = p.getInt32(20) / div; }
+    else if (len >= 44) {
+      t.volume = p.getInt32(16); t.open = p.getInt32(28) / div; t.high = p.getInt32(32) / div; t.low = p.getInt32(36) / div; t.close = p.getInt32(40) / div;
+      if (len >= 184) {
+        t.oi = p.getInt32(48);
+        const bq = p.getInt32(64), bp = p.getInt32(68) / div, aq = p.getInt32(64 + 60), ap = p.getInt32(68 + 60) / div;
+        t.bid = bq ? bp : null; t.ask = aq ? ap : null;
+      }
+    }
+    out.push(t);
+  }
+  return out;
+}
+function tkSend(o) { try { TK.ws?.readyState === 1 && TK.ws.send(JSON.stringify(o)); } catch {} }
+function tkWanted(sym) {
+  const d = S.oc?.stocks?.[sym]; const set = new Set();
+  if (!d) return set;
+  if (d.utk) set.add(d.utk);
+  (d.tk || []).forEach(([c, p]) => { if (c) set.add(c); if (p) set.add(p); });
+  return set;
+}
+function tkResubscribe() {
+  if (!TK.ws || TK.ws.readyState !== 1) return;
+  const want = tkWanted(TK.sym), drop = [...TK.subs].filter(x => !want.has(x)), add = [...want].filter(x => !TK.subs.has(x));
+  if (drop.length) tkSend({ a: "unsubscribe", v: drop });
+  if (add.length) { tkSend({ a: "subscribe", v: add }); tkSend({ a: "mode", v: ["full", add] }); }
+  TK.subs = want;
+}
+async function ensureTicks(sym) {
+  TK.sym = sym;
+  if (!(await tkCredentials())) return;
+  if (!tkWanted(sym).size) { tkSet("wait", "No instrument list yet for ticks; it comes with the next option snapshot"); return; }
+  if (TK.ws && (TK.ws.readyState === 0 || TK.ws.readyState === 1)) { tkResubscribe(); return; }
+  tkConnect();
+}
+function tkConnect() {
+  clearTimeout(TK.timer); tkSet("connecting");
+  let ws;
+  try { ws = new WebSocket(`wss://ws.kite.trade?api_key=${encodeURIComponent(TK.apiKey)}&access_token=${encodeURIComponent(TK.token)}`); }
+  catch (e) { tkSet("error", "This browser could not open Kite's tick feed"); return; }
+  ws.binaryType = "arraybuffer"; TK.ws = ws; TK.subs = new Set();
+  ws.onopen = () => { TK.opened = true; TK.tries = 0; tkSet("live"); tkResubscribe(); };
+  ws.onmessage = ev => {
+    if (typeof ev.data === "string") { try { const m = JSON.parse(ev.data); if (m.type === "error") tkSet("error", "Kite: " + m.data); } catch {} return; }
+    const ticks = parseTicks(ev.data); if (!ticks.length) return;
+    for (const t of ticks) TK.data.set(t.token, { ...TK.data.get(t.token), ...t, at: Date.now() });
+    tkSchedule();
+  };
+  ws.onclose = ev => {
+    TK.ws = null; TK.subs = new Set();
+    if (ev.code === 1008 || ev.code === 4003 || /token|auth/i.test(ev.reason || "")) { TK.token = null; tkSet("error", "Kite rejected today's token. Start a live watch to refresh it"); return; }
+    TK.tries++;
+    if (!TK.opened && TK.tries >= 3) { tkSet("error", "Kite didn't accept a browser connection; showing snapshots instead"); return; }
+    if (document.visibilityState !== "visible") { tkSet("wait", "Ticks paused"); return; }
+    tkSet("connecting"); TK.timer = setTimeout(tkConnect, Math.min(30000, 1500 * 2 ** Math.min(TK.tries, 4)));
+  };
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && TK.sym && !TK.ws && TK.status !== "error") ensureTicks(TK.sym); });
+let tkRender = 0, tkChartAt = 0;
+function tkSchedule() {
+  if (tkRender) return;
+  tkRender = setTimeout(() => {
+    tkRender = 0;
+    if (S.tab !== "chart" && !document.body.classList.contains("mkt")) return;
+    renderOC();
+    if (Date.now() - tkChartAt > 1000) { tkChartAt = Date.now(); drawChart(); }
+  }, 350);
+}
+function tickFor(token) { const t = token && TK.data.get(token); return t && TK.status === "live" && Date.now() - t.at < 5 * 60e3 ? t : null; }
+function tickPriceFor(sym) { const d = S.oc?.stocks?.[sym]; const t = d && tickFor(d.utk); return t ? t : null; }
+function ivJS(price, s, k, T, call) {
+  if (!(price > 0) || !(s > 0) || !(T > 0)) return null;
+  const disc = k * Math.exp(-.065 * T), floor = call ? Math.max(0, s - disc) : Math.max(0, disc - s);
+  if (price <= floor + 1e-9) return null;
+  let lo = .005, hi = 5; if (bs(s, k, T, .065, hi, call) < price) return null;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (bs(s, k, T, .065, m, call) > price) hi = m; else lo = m; }
+  return +((lo + hi) * 50).toFixed(1);
+}
+function liveChain(d) {
+  if (TK.status !== "live" || !d.tk) return { ...d, ticks: false };
+  const u = tickFor(d.utk), spot = u ? u.ltp : d.spot;
+  const exp = d.exp && d.exp !== "sample" ? new Date(d.exp + "T15:30:00+05:30") : null;
+  const T = exp ? Math.max((exp - new Date()) / 31536e6, 1 / 365 / 24) : 12 / 365;
+  let any = !!u;
+  const leg = (arr, i, col) => { const t = tickFor(d.tk[i]?.[col]); const o = arr[i]; if (!t) return o; any = true;
+    return [t.ltp, t.oi ?? o?.[1] ?? 0, ivJS(t.ltp, spot, d.k[i], T, col === 0), t.volume ?? o?.[3] ?? 0, t.bid, t.ask]; };
+  const c = d.k.map((_, i) => leg(d.c, i, 0)), p = d.k.map((_, i) => leg(d.p, i, 1));
+  const coi = c.reduce((s, x) => s + (x?.[1] || 0), 0), poi = p.reduce((s, x) => s + (x?.[1] || 0), 0);
+  const ai = d.k.indexOf(d.atm), ivs = [c[ai]?.[2], p[ai]?.[2]].filter(Boolean);
+  return { ...d, c, p, spot, ticks: any, pcr: coi ? +(poi / coi).toFixed(2) : d.pcr, mp: (coi + poi) ? maxPainJS(d.k, c.map(x => x?.[1] || 0), p.map(x => x?.[1] || 0)) : d.mp, iv: ivs.length ? +(ivs.reduce((a, b) => a + b, 0) / ivs.length).toFixed(1) : d.iv };
+}
+function maxPainJS(ks, co, po) { let best = null, bk = null; for (const s of ks) { let pay = 0; ks.forEach((k, i) => { pay += co[i] * Math.max(0, s - k) + po[i] * Math.max(0, k - s); }); if (best === null || pay < best) { best = pay; bk = s; } } return bk; }
 
 /* ---------- OPTION CHAIN ---------- */
 function ncdf(x) { const t = 1 / (1 + .2316419 * Math.abs(x)), d = .3989423 * Math.exp(-x * x / 2), p = d * t * (.3193815 + t * (-.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
@@ -1312,18 +1462,18 @@ function biasFor(sym) {
   return null;
 }
 function renderOC() {
-  const card = $("#ocCard"), d = S.oc?.stocks?.[S.sym];
+  const card = $("#ocCard"), d0 = S.oc?.stocks?.[S.sym], d = d0 ? liveChain(d0) : null;
   if (!d) {
     $("#ocAsOf").textContent = "";
     card.innerHTML = `<div class="empty">${S.oc ? `No option data for ${esc(S.sym)} yet.` : "No option data saved yet."} It is saved by the day-end scan and refreshed every 3 minutes during a live watch.</div>`;
     return;
   }
-  if (S.desk) { const up2 = ist(new Date(S.oc.updated)); $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up2.date === ist().date ? "" : niceDate(up2.date) + " "}${up2.hm}`; return renderChainDesk(d); }
+  if (S.desk) { const up2 = ist(new Date(S.oc.updated)); $("#ocAsOf").textContent = d.ticks ? "" : S.oc.sample ? "sample" : `${up2.date === ist().date ? "" : niceDate(up2.date) + " "}${up2.hm}`; return renderChainDesk(d); }
   const bias = biasFor(S.sym);
   if (!S.ocSideFor || S.ocSideFor !== S.sym) { S.ocSide = bias || "CE"; S.ocSideFor = S.sym; }
   const side = S.ocSide, call = side === "CE", ai = d.k.indexOf(d.atm);
   const up = ist(new Date(S.oc.updated));
-  $("#ocAsOf").textContent = S.oc.sample ? "sample" : `${up.date === ist().date ? "" : niceDate(up.date) + " "}${up.hm}`;
+  $("#ocAsOf").textContent = d.ticks ? "" : S.oc.sample ? "sample" : `${up.date === ist().date ? "" : niceDate(up.date) + " "}${up.hm}`;
   const expDate = d.exp === "sample" ? null : new Date(d.exp + "T15:30:00+05:30");
   const tY = expDate ? Math.max((expDate - new Date()) / 31536e6, 1 / 365 / 24) : 12 / 365;
   const days = expDate ? Math.max(0, Math.ceil((expDate - new Date()) / 864e5)) : null;
@@ -1331,13 +1481,13 @@ function renderOC() {
   const rows = picks.map(([tag, i]) => {
     const k = d.k[i], o = (call ? d.c : d.p)[i];
     if (!o || !o[0]) return `<div class="opt"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="cap">No trades in this strike</div></div>`;
-    const [ltp, oi, iv, vol] = o, sig = (iv || d.iv || 30) / 100;
+    const [ltp, oi, iv, vol, bid, ask] = o, sig = (iv || d.iv || 30) / 100;
     const sq = sig * Math.sqrt(tY), d1 = (Math.log(d.spot / k) + (0.065 + sig * sig / 2) * tY) / sq, delta = call ? ncdf(d1) : ncdf(d1) - 1;
     const perPct = Math.abs(delta) * d.spot * 0.01, lot = d.lot || 0;
     const rs = v => "₹" + fmt(v);
     return `<div class="opt">
       <div class="opt-top"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="opt-px">${rs(ltp)}</div></div>
-      <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
+      <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}${bid != null && ask != null ? ` · bid/ask ${fmt(bid)}/${fmt(ask)}` : ""}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
       <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>
     </div>`;
   }).join("");
@@ -1347,7 +1497,7 @@ function renderOC() {
     ${rows}
     <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target and stop use your 20–30% / 10–15% rule on the last traded premium.</div>`;
 }
-async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); }
+async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
 
 function readout() {
   const G = S.geo, el = $("#readout"); if (!G) return;
@@ -1497,6 +1647,7 @@ $("#setForm").addEventListener("submit", async e => {
   const tk = $("#ghToken").value.trim(), repo = $("#repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
   if (tk) { S.token = tk; store.set("token", tk); } if (repo) { S.repo = repo; store.set("repo", repo); }
   S.apiKey = $("#apiKey").value.trim(); store.set("apiKey", S.apiKey); $("#ghToken").value = "";
+  const pin = $("#tickPin").value.trim(); if (pin) { store.set("tickPin", pin); $("#tickPin").value = ""; TK.token = null; try { TK.ws?.close(); } catch {} TK.tries = 0; TK.opened = false; }
   if (!S.token) { $("#setState").textContent = "Saved. Add a GitHub token to load your data."; return paintRun(); }
   $("#setState").textContent = "Checking…";
   try { const r = await gh(`/repos/${S.repo}`); if (!r) throw new Error(`Can’t see ${S.repo}. Check the name and that the token includes this repo.`);
@@ -1524,7 +1675,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-27.1";
+const APP_VERSION = "2026-10-27.2";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
