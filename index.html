@@ -248,6 +248,13 @@ body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
 
 .lotmoney { width: 100%; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; font-weight: 600; padding-top: 4px; }
 .lotmoney span:first-child { color: var(--ink2); font-weight: 500; }
+.riskline { width: 100%; font-size: 12.5px; padding: 6px 8px; border-radius: 8px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.riskline.ok { background: color-mix(in srgb, var(--up) 10%, transparent); }
+.riskline.warn { background: color-mix(in srgb, var(--amber) 14%, transparent); }
+.riskline.bad { background: color-mix(in srgb, var(--down) 12%, transparent); }
+.riskline .rchip { font-size: 11px; font-weight: 700; }
+.riskline.ok .rchip { color: var(--up); } .riskline.warn .rchip { color: var(--amber); } .riskline.bad .rchip { color: var(--down); }
+.riskline .cap { width: 100%; font-size: 11.5px; }
 
 /* live ticks pill */
 .tickpill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
@@ -442,6 +449,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       <form id="setForm">
         <div class="frow"><label for="ghToken">GitHub token</label><input type="password" id="ghToken" autocomplete="off" placeholder="github_pat_…"><div class="hint">Fine-grained, Turtle-strategy only. Actions: Read and write. Contents: Read. Saved only on this phone.</div></div>
         <div class="frow"><label for="repo">Repository</label><input type="text" id="repo" value="lazzypj/Turtle-strategy" autocapitalize="off" spellcheck="false"></div>
+        <div class="frow"><label for="maxLossIn">Max loss per trade (₹)</label><input type="number" id="maxLossIn" min="100" step="50" inputmode="numeric" placeholder="1200"><div class="hint">Sets the stop shown for each option so one trade never loses more than this, charges included.</div></div>
         <div class="frow"><label for="tickPin">Live ticks PIN</label><input type="password" id="tickPin" autocomplete="off" inputmode="numeric" placeholder="same as your TICK_PIN secret"><div class="hint">Saved only on this device. See “Live ticks” below.</div></div>
         <div class="frow"><label for="apiKey">Kite API key</label><input type="text" id="apiKey" autocapitalize="off" spellcheck="false" placeholder="api_key, not the secret"></div>
         <div class="frow"><button class="btn primary" type="submit">Save and connect</button><button class="btn" type="button" id="forget">Forget token</button><div class="hint" id="setState"></div></div>
@@ -1273,7 +1281,7 @@ function renderJournal() {
       const sig = t.signal === "after_break" ? `after break +${t.delay_min} min` : t.signal === "near" ? "near level, no break yet" : t.signal === "none" ? "no alert" : "watch off";
       const name = t.opt === "EQ" ? `${t.underlying} shares (${t.dir === "short" ? "short" : "long"})` : `${t.underlying} ${t.strike ? fmt(t.strike, t.strike % 1 ? 1 : 0) : ""} ${t.opt || ""}`.trim();
       return `<div class="cell" data-sym="${esc(t.underlying)}" role="button" tabindex="0"><div class="sym"><span class="mark ${t.opt === "PE" ? "DOWN" : "UP"}"></span><em>${esc(name)}</em></div><div class="px ${t.net >= 0 ? "up" : "down"}">${rupee(t.net)}</div>
-        <div class="meta wrap">${(t.entry_time || "").slice(0, 5)} → ${(t.exit_time || "").slice(0, 5)} · ${t.hold_min != null ? Math.round(t.hold_min) + " min" : ""} · ${fmt(t.buy_avg)} → ${fmt(t.sell_avg)} · ${sig}</div>
+        <div class="meta wrap">${t.net < -maxLoss() ? `<span class="tagc" style="background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)">over ₹${maxLoss().toLocaleString("en-IN")} limit</span> ` : ""}${(t.entry_time || "").slice(0, 5)} → ${(t.exit_time || "").slice(0, 5)} · ${t.hold_min != null ? Math.round(t.hold_min) + " min" : ""} · ${fmt(t.buy_avg)} → ${fmt(t.sell_avg)} · ${sig}</div>
         <div class="pill ${t.ret_pct > 0 ? "UP" : "DOWN"}">${pct(t.ret_pct, 1)}</div></div>`; }).join("")}</div>`;
   } else if (P.trips.length) html += `<p class="foot">Tap a coloured day in the calendar to see its trades.</p>`;
   if (S.journal.open?.length) html += `<div class="gh">Open positions</div><div class="list">${S.journal.open.map(t => `<div class="kv"><span>${esc(t.underlying)} ${t.strike ? fmt(t.strike, 0) : ""} ${t.opt}<small>since ${niceDate(t.date)} ${t.entry_time.slice(0, 5)}</small></span><span>${t.open_qty} @ ${fmt(t.buy_avg ?? t.sell_avg)}</span><span></span></div>`).join("")}</div>`;
@@ -1292,13 +1300,28 @@ function lotCharges(prem, lot) {   // round trip, one lot, estimated Zerodha opt
   const v = prem * lot, brok = 40, exch = 0.0003503 * 2 * v, sebi = 2 * v / 1e7;
   return brok + 0.001 * v + exch + sebi + 0.00003 * v + 0.18 * (brok + exch + sebi);
 }
+const maxLoss = () => Math.max(100, +store.get("maxLoss", "1200") || 1200);
+// Stop that keeps one lot's loss (including charges) within the max-loss limit, capped at the 15% rule.
+function riskPlan(prem, lot) {
+  const cap = maxLoss(), ch = lotCharges(prem, lot), allowed = cap - ch, pos = prem * lot;
+  const capPct = allowed / pos, stopPct = Math.min(.15, capPct);
+  const lossAt = p => pos * p + ch;
+  let lots = 0; while (lossAt(stopPct) * (lots + 1) <= cap + 1e-6 && lots < 50) lots++;
+  const status = capPct >= .15 ? "ok" : capPct >= .10 ? "tight" : capPct >= .05 ? "tighter" : "skip";
+  return { cap, ch, stopPct, stopPx: prem * (1 - stopPct), loss: lossAt(Math.max(0, stopPct)), lots, status, capPct };
+}
 function lotMoney(prem, lot) {
   if (!prem || !lot) return "";
-  const r = v => "₹" + Math.round(v).toLocaleString("en-IN"), ch = lotCharges(prem, lot);
+  const r = v => "₹" + Math.round(v).toLocaleString("en-IN"), rp = riskPlan(prem, lot);
+  const chip = { ok: ["ok", "within your 15% rule"], tight: ["warn", "tighter than 15%, still within 10–15%"], tighter: ["warn", `tighter than your 10% rule`], skip: ["bad", "too tight to trade; pick a cheaper strike"] }[rp.status];
+  const stopTxt = rp.status === "skip"
+    ? `1 lot at even a 5% stop loses more than ${r(rp.cap)}`
+    : `Stop ₹${fmt(rp.stopPx)} (−${(rp.stopPct * 100).toFixed(1)}%) → loss ≈ ${r(rp.loss)} incl. charges`;
   return `<div class="lotmoney"><span>Per lot (${lot}):</span>
-    <span class="up">+${r(prem * lot * .2)} to +${r(prem * lot * .3)}</span>
-    <span class="down">−${r(prem * lot * .1)} to −${r(prem * lot * .15)}</span>
-    <span class="cap">charges ≈ ${r(ch)}</span></div>`;
+      <span class="up">target +${r(prem * lot * .2)} to +${r(prem * lot * .3)}</span>
+      <span class="cap">charges ≈ ${r(rp.ch)}</span></div>
+    <div class="riskline ${chip[0]}"><b>Max loss ${r(rp.cap)}:</b> ${stopTxt}<span class="rchip">${chip[1]}</span>
+      ${rp.status !== "skip" ? `<span class="cap">${rp.lots > 1 ? `Up to ${rp.lots} lots fit this limit at this stop` : `1 lot only (2 lots would risk ≈ ${r(rp.loss * 2)})`}</span>` : ""}</div>`;
 }
 
 /* ---------- expiries ---------- */
@@ -1338,7 +1361,7 @@ function renderChainDesk(d) {
   const leg = (call ? d.c : d.p)[sel.i], k = d.k[sel.i];
   const rs = v => "₹" + fmt(v);
   const rule = leg && leg[0] ? `<b>${fmt(k, k % 1 ? 1 : 0)} ${sel.side}</b> ${rs(leg[0])}${leg[4] != null && leg[5] != null ? ` <span class="cap">bid ${fmt(leg[4])} / ask ${fmt(leg[5])}</span>` : ""}${d.lot ? ` · lot ${d.lot} = ₹${fmt(leg[0] * d.lot, 0)}` : ""}
-      <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span> <span class="down">Stop ${rs(leg[0] * 0.9)}–${rs(leg[0] * 0.85)}</span>${lotMoney(leg[0], d.lot)}`
+      <span class="up">Target ${rs(leg[0] * 1.2)}–${rs(leg[0] * 1.3)}</span>${lotMoney(leg[0], d.lot)}`
     : `<b>${fmt(k, 0)} ${sel.side}</b> no trades in this strike`;
   const exps = chainExps(S.sym), today = dUTC(ist().date);
   const tabs = exps.length > 1 ? `<div class="seg exptabs" role="group" aria-label="Expiry">${exps.map(e => {
@@ -1550,7 +1573,7 @@ function renderOC() {
     return `<div class="opt">
       <div class="opt-top"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="opt-px">${rs(ltp)}</div></div>
       <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}${bid != null && ask != null ? ` · bid/ask ${fmt(bid)}/${fmt(ask)}` : ""}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
-      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>${lotMoney(ltp, lot)}
+      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>${lotMoney(ltp, lot)}
     </div>`;
   }).join("");
   card.innerHTML = `<div class="opt-head">
@@ -1710,6 +1733,7 @@ $("#setForm").addEventListener("submit", async e => {
   const tk = $("#ghToken").value.trim(), repo = $("#repo").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
   if (tk) { S.token = tk; store.set("token", tk); } if (repo) { S.repo = repo; store.set("repo", repo); }
   S.apiKey = $("#apiKey").value.trim(); store.set("apiKey", S.apiKey); $("#ghToken").value = "";
+  const ml = +$("#maxLossIn").value; if (ml >= 100) store.set("maxLoss", String(Math.round(ml)));
   const pin = $("#tickPin").value.trim(); if (pin) { store.set("tickPin", pin); $("#tickPin").value = ""; TK.token = null; try { TK.ws?.close(); } catch {} TK.tries = 0; TK.opened = false; }
   if (!S.token) { $("#setState").textContent = "Saved. Add a GitHub token to load your data."; return paintRun(); }
   $("#setState").textContent = "Checking…";
@@ -1738,7 +1762,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-27.5";
+const APP_VERSION = "2026-10-27.6";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1765,6 +1789,7 @@ window.addEventListener("hashchange", deepLink);
 
 /* ---------- boot ---------- */
 applyDesk();
+$("#maxLossIn").value = maxLoss();
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 $("#verLine").textContent = "App version " + APP_VERSION;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
