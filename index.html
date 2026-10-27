@@ -845,7 +845,10 @@ function drawChart() {
     if (!loading) g.fillText(S.barsErr || "Saved by the day-end scan, and every 5 min for flagged stocks during a live watch.", w / 2, h / 2 + 12);
     $("#readout").textContent = ""; legend([]); return;
   }
-  const n = Math.min(daily ? S.n : VIEW_N[S.iv], series.length), start = series.length - n, view = series.slice(start);
+  const n = daily ? Math.min(S.n, series.length) : (() => {   // intraday: whole sessions only (1m: today, 5m/15m: last 2)
+    const keep = S.iv === "1m" ? 1 : 2, days = [...new Set(series.map(x => x.d))].slice(-keep);
+    return series.length - series.findIndex(x => x.d >= days[0]);
+  })(), start = series.length - n, view = series.slice(start);
   const closes = series.map(x => x.c);
   const mas = MA_DEF.filter(m => S.mas.includes(m[0])).map(([name, kind, len, col]) => ({ name, col: tok(col), vals: (kind === "sma" ? sma : ema)(closes, len).slice(start) }));
   let ch = null, lv = [];
@@ -1735,7 +1738,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-27.4";
+const APP_VERSION = "2026-10-27.5";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
