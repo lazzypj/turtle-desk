@@ -67,7 +67,6 @@ main > section.on { display: block; }
 /* segmented control */
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--fill); border-radius: 9px; padding: 2px; gap: 2px; }
 .seg button { border: 0; background: none; border-radius: 7px; padding: 6px 8px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
-#modeSeg { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
 .seg button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 
 /* stat strip */
@@ -214,25 +213,6 @@ body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
 .mkt-row b { font-size: 15px; } .mkt-row small { font-size: 12px; color: var(--ink2); font-weight: 600; letter-spacing: .02em; }
 .mkt-bias { font-size: 13px; color: var(--ink2); }
 .tagc { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--fill); color: var(--ink2); margin-left: 2px; vertical-align: 1px; }
-.tagc.take { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
-.tagc.skip { color: var(--ink3); }
-.tagc.wait { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
-.guard { font-size: 13px; color: var(--ink2); margin: 12px 4px 0; display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; }
-.guard b { color: var(--ink); }
-.guard.stop { background: color-mix(in srgb, var(--down) 12%, var(--card)); color: var(--ink); border-radius: 12px; padding: 10px 14px; margin: 12px 0 0; }
-.guard.stop b { color: var(--down); }
-.setup { padding: 12px 14px; border-top: .5px solid var(--sep); display: grid; gap: 6px; cursor: pointer; }
-.setup:first-child { border-top: 0; }
-.setup-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.setup-top b { font-size: 16px; }
-.checks { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--ink2); }
-.checks .ok { color: var(--up); font-weight: 600; } .checks .no { color: var(--down); font-weight: 600; }
-.plan { font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
-.plan .over { color: var(--down); font-weight: 600; }
-.why2 { font-size: 12.5px; color: var(--ink2); }
-.caution { font-size: 12.5px; color: var(--amber); font-weight: 600; }
-details.skips > summary { list-style: none; padding: 12px 14px; display: flex; justify-content: space-between; font-size: 14px; cursor: pointer; }
-details.skips > summary::-webkit-details-marker { display: none; }
 .tagc.fresh { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 
 /* journal */
@@ -363,7 +343,6 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
     <div class="ttl">Live</div>
     <div class="cap" id="liveCap">No live run yet</div>
     <div class="mktbar" id="mktCard" hidden></div>
-    <div id="setupsBox"></div>
     <div class="seg" id="winSeg" role="group" aria-label="Window" style="margin-top:12px">
       <button data-w="all" aria-pressed="true">20D + 55D</button><button data-w="55" aria-pressed="false">55D only</button><button data-w="20" aria-pressed="false">20D only</button>
     </div>
@@ -442,16 +421,12 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       </div>
       <div class="frow">
         <div class="flabel"><span class="stepnum">3</span>Choose and start</div>
-        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button><button data-m="backtest" aria-pressed="false">Backtest</button><button data-m="price" aria-pressed="false">Price study</button><button data-m="scalp" aria-pressed="false">Index scalp</button></div>
+        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button></div>
         <div class="two" id="liveOpts">
           <div><label for="mins">Minutes</label><input type="number" id="mins" min="5" max="120" value="75" inputmode="numeric"></div>
           <div><label for="nearAtr">Near (× ATR)</label><input type="number" id="nearAtr" min="0.05" max="3" step="0.05" value="0.3" inputmode="decimal"></div>
           <div><label for="quiet">Alerts from</label><input type="time" id="quiet" value="09:18" min="09:15" max="15:29"></div>
         </div>
-        <div class="two" id="riskOpts">
-          <div><label for="maxLoss">Max loss per trade (₹)</label><input type="number" id="maxLoss" min="100" max="100000" step="100" inputmode="numeric"></div>
-        </div>
-        <div id="btOpts"><label for="btDays">Days to test</label><input type="number" id="btDays" min="60" max="1500" value="180" inputmode="numeric"></div>
         <div class="hint" id="modeHint"></div>
       </div>
     </div>
@@ -490,7 +465,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
         <div class="row" style="display:flex;gap:8px;align-items:center;margin:6px 0"><code id="topicSug" style="font-size:14px;background:var(--fill);padding:6px 8px;border-radius:6px;user-select:all"></code><button class="btn" id="copyTopic" type="button" style="width:auto;padding:6px 12px;font-size:14px">Copy</button></div>
         3. In GitHub: Turtle-strategy › Settings › Secrets and variables › Actions › New repository secret. Name <b>NTFY_TOPIC</b>, value: the topic.<br>
         4. In the ntfy app, tap <b>+</b> and subscribe to the same topic.<br>
-        From the next live watch you get one alert when the watch starts, one <b>TAKE</b> alert for each break that passes the trade checklist (at most one per stock every 15 minutes), one if you reach the day limit (4 trades or 3 losses in a row), and one when it ends. Tapping an alert opens that stock here.
+        From the next live watch you get one alert when the watch starts, one per fresh break after the quiet time (at most one per stock every 15 minutes), and one when it ends. Tapping an alert opens that stock here.
       </div></div>
     </details>
     <p class="foot">Kite data is for your own use. Don’t save your token on a shared device.</p>
@@ -526,7 +501,6 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
-  maxLoss: +store.get("maxLoss", "1200") || 1200,
   brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1",
   jView: "month", jAnchor: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), jDay: null, journal: null,
   sym: store.get("sym", ""), n: +store.get("n", "120") || 120, desk: store.get("desk", "") ? store.get("desk") === "1" : window.innerWidth >= 1200,
@@ -680,57 +654,8 @@ function renderMarket() {
     <div class="mkt-bias">Breaks <b class="up">▲${up}</b> <b class="down">▼${dn}</b> · fresh after ${esc(L.quiet_until || "09:18")} <b class="up">▲${upF}</b> <b class="down">▼${dnF}</b>${bias ? ` · ${bias}` : ""}</div>`;
   el.hidden = false;
 }
-/* ---------- trade checklist (setups from the live watch) ---------- */
-const GRADE_TAG = { TAKE: ["TAKE", "take"], WAIT: ["5-min wait", "wait"], SKIP: ["Skip", "skip"], FAILED: ["Failed", "skip"], LATE: ["Late", "skip"] };
-function rulesOf(L) { return { target_pct: 20, stop_pct: 15, take_minutes: 10, min_rvol: 2, max_jump_atr: 0.25, min_breadth: 5, ...(L?.rules || {}) }; }
-function setupFor(sym, side) {
-  const L = S.live; if (!L?.setups || L.date !== ist().date) return null;
-  return L.setups.find(x => x.symbol === sym && (!side || x.side === side)) || null;
-}
-const rupees = v => "₹" + Math.round(v).toLocaleString("en-IN");
-function addMin(hm, n) { const [h, m] = hm.split(":").map(Number), t = h * 60 + m + n; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; }
-function checkRow(x, R) {
-  const c = x.checks || {}, up = x.side === "UP";
-  if (!x.time) return `<div class="checks"><span>Crossed ${esc(x.touch || "")} · waiting for a 5-minute candle to close past ${fmt(x.level)}</span></div>`;
-  const it = (ok, txt) => `<span class="${ok == null ? "" : ok ? "ok" : "no"}">${ok == null ? "?" : ok ? "✓" : "✗"} ${txt}</span>`;
-  return `<div class="checks">${it(true, "5-min close")}${it(c.vol == null ? null : c.vol >= R.min_rvol, `vol ${c.vol != null ? c.vol.toFixed(1) + "×" : "–"}`)}${it(c.jump == null ? null : c.jump <= R.max_jump_atr, `jump ${c.jump != null ? c.jump.toFixed(2) : "–"} ATR`)}${it(c.time, "09:18–14:30")}${it(c.breadth >= R.min_breadth, `${c.breadth} other ${up ? "breakouts" : "breakdowns"}`)}</div>`;
-}
-function planRow(o) {
-  if (!o) return "";
-  const over = o.lot_risk > S.maxLoss;
-  return `<div class="plan"><span><b>ATM ${fmt(o.strike, o.strike % 1 ? 1 : 0)} ${o.type}</b> ~₹${fmt(o.premium)}</span><span class="up">target ₹${fmt(o.target)}</span><span class="down">stop ₹${fmt(o.stop)}</span></div>
-    ${o.lot ? `<div class="plan"><span>1 lot ${o.lot} = ${rupees(o.lot_cost)}</span><span class="${over ? "over" : ""}">risk at stop ${rupees(o.lot_risk)}${over ? ` · over your ${rupees(S.maxLoss)} limit` : ""}</span></div>` : ""}`;
-}
-function renderSetups() {
-  const L = S.live, box = $("#setupsBox");
-  if (!L || !L.setups || L.date !== ist().date) { box.innerHTML = ""; return; }
-  const R = rulesOf(L), g = L.guard, all = L.setups;
-  const by = k => all.filter(x => x.grade === k);
-  const take = by("TAKE"), wait = by("WAIT"), done = all.filter(x => ["SKIP", "FAILED", "LATE"].includes(x.grade));
-  let html = "";
-  if (g) html += g.stop ? `<div class="guard stop"><span><b>Day limit reached</b> · ${esc(g.why)}. No more trades today.</span></div>`
-    : `<div class="guard"><span>Trades <b>${g.trades}/${g.max_trades}</b></span><span>Losses in a row <b>${g.loss_streak}/${g.max_streak}</b></span>${g.closed ? `<span>Closed P&amp;L <b class="${g.gross >= 0 ? "up" : "down"}">${g.gross >= 0 ? "+" : "−"}${rupees(Math.abs(g.gross))}</b> <span class="cap">before charges</span></span>` : ""}</div>`;
-  const card = x => {
-    const up = x.side === "UP", [t, cls] = GRADE_TAG[x.grade] || [x.grade, "skip"];
-    const sub = x.grade === "TAKE" ? `valid till ${addMin(x.time, R.take_minutes)} while price stays past ${fmt(x.level)}`
-      : x.grade === "WAIT" ? "" : x.grade === "FAILED" ? `fell back inside the level at ${esc(x.ended || "")}`
-      : x.grade === "LATE" ? `passed at ${esc(x.time)}, now too late` : `5-min close ${esc(x.time || "")}`;
-    return `<div class="setup" data-sym="${esc(x.symbol)}" role="button" tabindex="0">
-      <div class="setup-top"><div><span class="mark ${x.side}"></span> <b>${esc(x.symbol)}</b> <span class="tagc ${cls}">${t}</span></div><span class="cap">${up ? "CALL" : "PUT"} · ${x.window}D ${up ? "high" : "low"}</span></div>
-      ${sub ? `<div class="why2">${sub}</div>` : ""}${checkRow(x, R)}
-      ${x.reasons?.length && x.grade === "SKIP" ? `<div class="why2">Skip: ${esc(x.reasons.join("; "))}</div>` : ""}
-      ${x.cautions?.length ? `<div class="caution">Caution: ${esc(x.cautions.join("; "))}</div>` : ""}
-      ${x.grade === "TAKE" || x.grade === "WAIT" ? planRow(x.option) : ""}</div>`;
-  };
-  html += `<div class="gh">Take now <span>${take.length ? take.length : "none"}</span></div><div class="list">${take.length ? take.map(card).join("") : `<div class="empty">No break passes the checklist right now. That is the normal state: most breaks fail it.</div>`}</div>`;
-  if (wait.length) html += `<div class="gh">Waiting for 5-min close <span>${wait.length}</span></div><div class="list">${wait.slice(0, 8).map(card).join("")}</div>`;
-  if (done.length) html += `<div class="gh">Checked today</div><details class="list skips"><summary><span>${done.length} breaks did not qualify or have passed</span><span class="chev">›</span></summary>${done.slice(0, 40).map(card).join("")}</details>`;
-  html += `<p class="foot">Checklist: 5-min close past the level · volume ≥ ${R.min_rvol}× usual · last-minute jump ≤ ${R.max_jump_atr} ATR · ${esc(R.start || "09:18")}–${esc(R.end || "14:30")} · ≥ ${R.min_breadth} other stocks broke the same way. Buy ATM, target +${R.target_pct}%, stop −${R.stop_pct}%. Backtest: about 52% wins, +2.5% average per trade before costs.</p>`;
-  box.innerHTML = html;
-}
 function renderLive() {
   const L = S.live, ls = liveState();
-  renderSetups();
   const rows = liveRows().filter(r => !(S.hideOpen && r.vt === 2 && (r.gap || r.opening)));
   renderMarket();
   $("#liveChips").innerHTML = `<button class="chip" data-lopt="brkOnly" aria-pressed="${S.brkOnly}"><i style="background:var(--down)"></i>Breaks only</button><button class="chip" data-lopt="hideOpen" aria-pressed="${S.hideOpen}"><i style="background:var(--ink3)"></i>Hide opening &amp; gap moves</button>`;
@@ -748,9 +673,7 @@ function renderLive() {
     return `<div class="gh">${name} <span>${sel.length}</span></div><div class="list">${sel.length ? sel.map(r => {
       const d = (r.ltp / r.vl - 1) * 100, both = S.win === "all" && r.s55 && r.s20 && r.vw === 55 ? " · 20D too" : "";
       const [p, pc] = chgPill(r.chg);
-      const su = r.vt === 2 ? setupFor(r.symbol, r.side) : null, gt = su && GRADE_TAG[su.grade];
-      const tag = (r.vt === 2 ? (r.gap ? `<span class="tagc">Gap open</span>` : r.opening ? `<span class="tagc">Opening move</span>` : r.fresh ? `<span class="tagc fresh">Fresh</span>` : "") : "")
-        + (gt ? ` <span class="tagc ${gt[1]}">${gt[0]}</span>` : "");
+      const tag = r.vt === 2 ? (r.gap ? `<span class="tagc">Gap open</span>` : r.opening ? `<span class="tagc">Opening move</span>` : r.fresh ? `<span class="tagc fresh">Fresh</span>` : "") : "";
       const vol = r.rvol != null ? `<span class="${r.rvol >= 2 ? "hot" : ""}">vol ${r.rvol.toFixed(1)}×</span>` : `<span class="${r.vol_pct >= 150 ? "hot" : ""}">vol ${(r.vol_pct / 100).toFixed(1)}× day avg</span>`;
       return cell({ sym: r.symbol, side, hollow: r.vt === 1, px: fmt(r.ltp), pill: p, pillCls: pc,
         meta: `${esc(r.since)} ${tag} · ${r.vw}D ${pct(d, 1)}${both} · ${vol}` });
@@ -1368,13 +1291,13 @@ function lotCharges(prem, lot) {   // round trip, one lot, estimated Zerodha opt
   const v = prem * lot, brok = 40, exch = 0.0003503 * 2 * v, sebi = 2 * v / 1e7;
   return brok + 0.001 * v + exch + sebi + 0.00003 * v + 0.18 * (brok + exch + sebi);
 }
-function lotMoney(prem, lot, R = rulesOf(S.live)) {
+function lotMoney(prem, lot) {
   if (!prem || !lot) return "";
-  const r = v => "₹" + Math.round(v).toLocaleString("en-IN"), ch = lotCharges(prem, lot), risk = prem * lot * R.stop_pct / 100;
+  const r = v => "₹" + Math.round(v).toLocaleString("en-IN"), ch = lotCharges(prem, lot);
   return `<div class="lotmoney"><span>Per lot (${lot}):</span>
-    <span class="up">+${r(prem * lot * R.target_pct / 100)}</span>
-    <span class="down">−${r(risk)}</span>
-    <span class="cap">charges ≈ ${r(ch)}</span>${risk > S.maxLoss ? `<span class="down">over your ${r(S.maxLoss)} limit</span>` : ""}</div>`;
+    <span class="up">+${r(prem * lot * .2)} to +${r(prem * lot * .3)}</span>
+    <span class="down">−${r(prem * lot * .1)} to −${r(prem * lot * .15)}</span>
+    <span class="cap">charges ≈ ${r(ch)}</span></div>`;
 }
 
 /* ---------- expiries ---------- */
@@ -1616,7 +1539,6 @@ function renderOC() {
   const tY = expDate ? Math.max((expDate - new Date()) / 31536e6, 1 / 365 / 24) : 12 / 365;
   const days = expDate ? Math.max(0, Math.ceil((expDate - new Date()) / 864e5)) : null;
   const picks = [["ATM", ai], ["1 ITM", call ? ai - 1 : ai + 1]].filter(([, i]) => i >= 0 && i < d.k.length);
-  const R = rulesOf(S.live), su = setupFor(S.sym, call ? "UP" : "DOWN");
   const rows = picks.map(([tag, i]) => {
     const k = d.k[i], o = (call ? d.c : d.p)[i];
     if (!o || !o[0]) return `<div class="opt"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="cap">No trades in this strike</div></div>`;
@@ -1627,15 +1549,14 @@ function renderOC() {
     return `<div class="opt">
       <div class="opt-top"><div><b>${fmt(k, k % 1 ? 1 : 0)} ${side}</b> <span class="tag">${tag}</span></div><div class="opt-px">${rs(ltp)}</div></div>
       <div class="opt-meta"><span>IV ${iv != null ? iv + "%" : "–"} · OI ${big(oi)} · Vol ${big(vol)}${bid != null && ask != null ? ` · bid/ask ${fmt(bid)}/${fmt(ask)}` : ""}</span><span>${lot ? "₹" + fmt(ltp * lot, 0) + " per lot" : ""}</span></div>
-      <div class="opt-rule"><span class="up">Target ${rs(ltp * (1 + R.target_pct / 100))}</span><span class="down">Stop ${rs(ltp * (1 - R.stop_pct / 100))}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>${lotMoney(ltp, lot, R)}
+      <div class="opt-rule"><span class="up">Target ${rs(ltp * 1.2)}–${rs(ltp * 1.3)}</span><span class="down">Stop ${rs(ltp * 0.9)}–${rs(ltp * 0.85)}</span><span>≈ ${rs(perPct)} per 1% stock move</span></div>${lotMoney(ltp, lot)}
     </div>`;
   }).join("");
   card.innerHTML = `<div class="opt-head">
       <div class="seg" id="ocSideSeg" role="group" aria-label="Calls or puts" style="width:150px"><button data-oside="CE" aria-pressed="${call}">Calls</button><button data-oside="PE" aria-pressed="${!call}">Puts</button></div>
       <div class="cap">${bias ? `Signal: ${bias === "CE" ? "breakout → calls" : "breakdown → puts"}` : "No signal today"}</div></div>
-    ${su ? `<div class="setup" style="cursor:default"><div class="setup-top"><div><b>Checklist</b> <span class="tagc ${(GRADE_TAG[su.grade] || [, "skip"])[1]}">${(GRADE_TAG[su.grade] || [su.grade])[0]}</span></div><span class="cap">${su.window}D ${su.side === "UP" ? "high" : "low"} ${fmt(su.level)}</span></div>${checkRow(su, R)}${su.reasons?.length && su.grade === "SKIP" ? `<div class="why2">Skip: ${esc(su.reasons.join("; "))}</div>` : ""}${su.cautions?.length ? `<div class="caution">Caution: ${esc(su.cautions.join("; "))}</div>` : ""}</div>` : ""}
     ${rows}
-    <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target +${R.target_pct}% and stop −${R.stop_pct}% of the last traded premium (the checklist rule). Buy ATM, not further out of the money.</div>`;
+    <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target and stop use your 20–30% / 10–15% rule on the last traded premium.</div>`;
 }
 async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
 
@@ -1662,16 +1583,13 @@ function reqToken() { const raw = $("#redirect").value.trim(); if (!raw) return 
 function paintRun() {
   const t = reqToken(), m = market(), mode = S.mode || (m.k === "closed" ? "daily" : "intraday");
   $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
-  $("#liveOpts").hidden = mode !== "intraday"; $("#btOpts").hidden = mode !== "backtest" && mode !== "price" && mode !== "scalp";
-  if (mode === "price" && +$("#btDays").value < 400) $("#btDays").value = 730;
-  if (mode === "backtest" && +$("#btDays").value > 400) $("#btDays").value = 180;
-  if (mode === "scalp" && (+$("#btDays").value < 300 || +$("#btDays").value > 1000)) $("#btDays").value = 365;
+  $("#liveOpts").hidden = mode !== "intraday";
   $("#runCap").textContent = !S.token ? "Connect GitHub below to start runs." : m.k === "open" ? `Market open · ${930 - m.t.mins} minutes left` : m.k === "pre" ? "Start the live watch before 09:15" : "Market closed · run the day-end scan";
-  $("#modeHint").textContent = mode === "scalp" ? "Nifty and Sensex 1-minute momentum scalp study, scored in index points only (no option pricing): 324 entry and exit rules, win rate and average win vs loss, nearest-expiry rotation, replay of 27 and 28 Oct. About 5–10 minutes. Results: data/index_scalp/report.md." : mode === "price" ? "Price-only study of every 20D/55D break: how stocks move after breaks, clean vs noisy breaks, 23 exits and a rule search tested on unseen months. First run about 60–90 minutes (downloads 2 years of 1-minute data, kept for next time). Results: data/price_bt/report.md." : mode === "backtest" ? "One-off study of past breakouts with simulated option trades. Takes about 15–20 minutes; results appear in the repo under data/backtest." : mode === "intraday"
+  $("#modeHint").textContent = mode === "intraday"
     ? (m.k === "closed" ? "The market is closed, so a live watch would stop at once." : "Free GitHub minutes cover about 75 minutes a trading day.")
     : (m.k === "open" ? "Today’s candle is still forming. Best after 15:35." : "Updates price history, option chains and minute candles. Takes about 4 minutes.");
   $("#startBtn").disabled = !(t && S.token);
-  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : mode === "backtest" ? "Run backtest" : mode === "price" ? "Run price study" : mode === "scalp" ? "Run index scalp study" : "Run day-end scan";
+  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : "Run day-end scan";
   const raw = $("#redirect").value.trim();
   $("#tokState").innerHTML = t ? `<span class="ok">Token found ·${esc(t.slice(-4))}</span> Start now, it expires in a few minutes.` : raw ? `<span class="bad">No request_token in this text.</span> Copy the full Example Domain address.` : "The token works once and expires in a few minutes.";
   $("#n2").className = "stepnum" + (t ? " done" : "");
@@ -1684,13 +1602,10 @@ async function startRun() {
   const t = reqToken(), m = market(), mode = S.mode || (m.k === "closed" ? "daily" : "intraday"); if (!t) return;
   const b = $("#startBtn"); b.disabled = true; b.textContent = "Starting…";
   const inputs = { request_token: t };
-  if (mode === "backtest") inputs.days = String(Math.max(60, Math.min(400, +$("#btDays").value || 180)));
-  if (mode === "price") inputs.days = String(Math.max(90, Math.min(1500, +$("#btDays").value || 730)));
-  if (mode === "scalp") inputs.days = String(Math.max(90, Math.min(1000, +$("#btDays").value || 365)));
   if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); inputs.quiet_until = $("#quiet").value || "09:18"; }
   try {
-    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : mode === "backtest" ? "backtest.yml" : mode === "price" ? "price_backtest.yml" : mode === "scalp" ? "index_scalp.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
-    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : mode === "scalp" ? "Index scalp study started. Takes about 5–10 minutes." : mode === "price" ? "Price study started. First run takes about 60–90 minutes." : mode === "backtest" ? "Backtest started. Takes about 15–20 minutes." : "Day-end scan started. Takes about 4 minutes.");
+    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
+    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : "Day-end scan started. Takes about 4 minutes.");
     pollRuns(18);
   } catch (e) { toast(e.message, 6000); }
   paintRun();
@@ -1707,7 +1622,7 @@ async function loadRuns() {
       let why = "";
       if (st === "failure") { try { const j = await gh(`/repos/${S.repo}/actions/runs/${run.id}/jobs`); const s = j?.jobs?.flatMap(x => x.steps || []).find(s => s.conclusion === "failure"); if (s) why = /Fetch|Watch/.test(s.name) ? "Kite login or data step failed. Usually an expired token: log in again and start within a minute." : `Failed at “${s.name}”.`; } catch {} }
       const t = ist(new Date(run.created_at));
-      return `<div class="run"><div><b>${esc(run.name.replace("Intraday Turtle watch", "Live watch").replace("Daily Donchian scan", "Day-end scan").replace("Breakout backtest", "Backtest"))}</b><div class="cap">${niceDate(t.date)} · ${t.hm} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">log</a></div></div><span class="st ${esc(st)}">${esc(st)}</span>${why ? `<div class="why">${esc(why)}</div>` : ""}</div>`;
+      return `<div class="run"><div><b>${esc(run.name.replace("Intraday Turtle watch", "Live watch").replace("Daily Donchian scan", "Day-end scan"))}</b><div class="cap">${niceDate(t.date)} · ${t.hm} · <a href="${esc(run.html_url)}" target="_blank" rel="noopener">log</a></div></div><span class="st ${esc(st)}">${esc(st)}</span>${why ? `<div class="why">${esc(why)}</div>` : ""}</div>`;
     }));
     $("#runs").innerHTML = html.join("") || `<div class="empty">No runs yet.</div>`;
     const running = runs.some(r => r.status !== "completed");
@@ -1785,8 +1700,6 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("[data-sym][role=button]")) { e.preventDefault(); openChart(e.target.dataset.sym); } });
 $("#refresh").addEventListener("click", () => { refresh(); if (S.tab === "run") loadRuns(); });
 $("#redirect").addEventListener("input", paintRun);
-$("#maxLoss").value = S.maxLoss;
-$("#maxLoss").addEventListener("change", e => { const v = Math.max(100, Math.round(+e.target.value || 1200)); S.maxLoss = v; e.target.value = v; store.set("maxLoss", String(v)); renderLive(); renderOC(); });
 $("#startBtn").addEventListener("click", startRun);
 $("#symForm").addEventListener("submit", e => { e.preventDefault(); const v = $("#symInput").value; if (v) { openChart(v); $("#symInput").blur(); } });
 $("#symInput").addEventListener("change", e => { const v = e.target.value.toUpperCase().trim(); if (S.prices?.has(v)) { openChart(v); e.target.blur(); } });
