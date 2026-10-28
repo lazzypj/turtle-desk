@@ -441,7 +441,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
       </div>
       <div class="frow">
         <div class="flabel"><span class="stepnum">3</span>Choose and start</div>
-        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button><button data-m="backtest" aria-pressed="false">Backtest</button></div>
+        <div class="seg" id="modeSeg" role="group" aria-label="Run type"><button data-m="intraday" aria-pressed="true">Live watch</button><button data-m="daily" aria-pressed="false">Day-end scan</button><button data-m="backtest" aria-pressed="false">Backtest</button><button data-m="price" aria-pressed="false">Price study</button></div>
         <div class="two" id="liveOpts">
           <div><label for="mins">Minutes</label><input type="number" id="mins" min="5" max="120" value="75" inputmode="numeric"></div>
           <div><label for="nearAtr">Near (× ATR)</label><input type="number" id="nearAtr" min="0.05" max="3" step="0.05" value="0.3" inputmode="decimal"></div>
@@ -450,7 +450,7 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
         <div class="two" id="riskOpts">
           <div><label for="maxLoss">Max loss per trade (₹)</label><input type="number" id="maxLoss" min="100" max="100000" step="100" inputmode="numeric"></div>
         </div>
-        <div id="btOpts"><label for="btDays">Days to test</label><input type="number" id="btDays" min="60" max="400" value="180" inputmode="numeric"></div>
+        <div id="btOpts"><label for="btDays">Days to test</label><input type="number" id="btDays" min="60" max="1500" value="180" inputmode="numeric"></div>
         <div class="hint" id="modeHint"></div>
       </div>
     </div>
@@ -1661,13 +1661,15 @@ function reqToken() { const raw = $("#redirect").value.trim(); if (!raw) return 
 function paintRun() {
   const t = reqToken(), m = market(), mode = S.mode || (m.k === "closed" ? "daily" : "intraday");
   $$("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
-  $("#liveOpts").hidden = mode !== "intraday"; $("#btOpts").hidden = mode !== "backtest";
+  $("#liveOpts").hidden = mode !== "intraday"; $("#btOpts").hidden = mode !== "backtest" && mode !== "price";
+  if (mode === "price" && +$("#btDays").value < 400) $("#btDays").value = 730;
+  if (mode === "backtest" && +$("#btDays").value > 400) $("#btDays").value = 180;
   $("#runCap").textContent = !S.token ? "Connect GitHub below to start runs." : m.k === "open" ? `Market open · ${930 - m.t.mins} minutes left` : m.k === "pre" ? "Start the live watch before 09:15" : "Market closed · run the day-end scan";
-  $("#modeHint").textContent = mode === "backtest" ? "One-off study of past breakouts with simulated option trades. Takes about 15–20 minutes; results appear in the repo under data/backtest." : mode === "intraday"
+  $("#modeHint").textContent = mode === "price" ? "Price-only study of every 20D/55D break: how stocks move after breaks, clean vs noisy breaks, 23 exits and a rule search tested on unseen months. First run about 60–90 minutes (downloads 2 years of 1-minute data, kept for next time). Results: data/price_bt/report.md." : mode === "backtest" ? "One-off study of past breakouts with simulated option trades. Takes about 15–20 minutes; results appear in the repo under data/backtest." : mode === "intraday"
     ? (m.k === "closed" ? "The market is closed, so a live watch would stop at once." : "Free GitHub minutes cover about 75 minutes a trading day.")
     : (m.k === "open" ? "Today’s candle is still forming. Best after 15:35." : "Updates price history, option chains and minute candles. Takes about 4 minutes.");
   $("#startBtn").disabled = !(t && S.token);
-  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : mode === "backtest" ? "Run backtest" : "Run day-end scan";
+  $("#startBtn").textContent = !S.token ? "Connect GitHub first" : !t ? "Paste the Kite address first" : mode === "intraday" ? "Start live watch" : mode === "backtest" ? "Run backtest" : mode === "price" ? "Run price study" : "Run day-end scan";
   const raw = $("#redirect").value.trim();
   $("#tokState").innerHTML = t ? `<span class="ok">Token found ·${esc(t.slice(-4))}</span> Start now, it expires in a few minutes.` : raw ? `<span class="bad">No request_token in this text.</span> Copy the full Example Domain address.` : "The token works once and expires in a few minutes.";
   $("#n2").className = "stepnum" + (t ? " done" : "");
@@ -1681,10 +1683,11 @@ async function startRun() {
   const b = $("#startBtn"); b.disabled = true; b.textContent = "Starting…";
   const inputs = { request_token: t };
   if (mode === "backtest") inputs.days = String(Math.max(60, Math.min(400, +$("#btDays").value || 180)));
+  if (mode === "price") inputs.days = String(Math.max(90, Math.min(1500, +$("#btDays").value || 730)));
   if (mode === "intraday") { inputs.watch_minutes = String(Math.max(5, Math.min(120, +$("#mins").value || 75))); inputs.near_atr = String(+$("#nearAtr").value || 0.3); inputs.quiet_until = $("#quiet").value || "09:18"; }
   try {
-    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : mode === "backtest" ? "backtest.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
-    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : mode === "backtest" ? "Backtest started. Takes about 15–20 minutes." : "Day-end scan started. Takes about 4 minutes.");
+    await gh(`/repos/${S.repo}/actions/workflows/${mode === "intraday" ? "intraday.yml" : mode === "backtest" ? "backtest.yml" : mode === "price" ? "price_backtest.yml" : "daily.yml"}/dispatches`, { method: "POST", body: { ref: "main", inputs } });
+    $("#redirect").value = ""; toast(mode === "intraday" ? "Live watch started. Stocks appear in about 2 minutes." : mode === "price" ? "Price study started. First run takes about 60–90 minutes." : mode === "backtest" ? "Backtest started. Takes about 15–20 minutes." : "Day-end scan started. Takes about 4 minutes.");
     pollRuns(18);
   } catch (e) { toast(e.message, 6000); }
   paintRun();
@@ -1817,7 +1820,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-28.1";
+const APP_VERSION = "2026-10-28.2";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
