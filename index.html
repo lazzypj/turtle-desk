@@ -184,7 +184,21 @@ body.desk.mkt .ws-chart .readout { margin: 6px 0 4px; min-height: 0; }
 body.desk.mkt .ws-chart .chips { margin-top: 8px; }
 body.desk.mkt .ws-below { grid-area: below; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
 body.desk.mkt .ws-read, body.desk.mkt .ws-levels { min-height: 0; overflow-y: auto; }
-body.desk.mkt .ws-side { grid-area: side; min-height: 0; overflow-y: auto; }
+body.desk.mkt .ws-side { display: none; }
+.ws-news { display: none; }
+body.desk.mkt .ws-news { display: block; grid-area: side; min-height: 0; overflow-y: auto; }
+.ni { display: block; padding: 10px 12px; border-top: 1px solid var(--sep); color: var(--ink); }
+.ni:first-child { border-top: 0; }
+.ni:hover { background: var(--fill); }
+.ni b { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.ni small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--ink3); }
+.ni.new small::before { content: "● "; color: var(--accent); }
+.ntag { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--fill); color: var(--ink2); margin-right: 6px; }
+.ntag.Results { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ntag.Order, .ntag.Dividend { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.ntag.Deal { color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); }
+.ntag.Regulator { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.newsfoot { padding: 10px 12px; border-top: 1px solid var(--sep); font-size: 12px; color: var(--ink3); }
 body.desk.mkt .gh { margin: 2px 4px 6px; }
 body.desk.mkt .ta-notes { font-size: 12.5px; gap: 3px; line-height: 1.35; margin: 4px 0; }
 body.desk.mkt .ta-head { padding: 8px 12px 0; }
@@ -393,6 +407,10 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
    <div class="ws-side">
     <div class="gh">Options <span><span id="tickPill" class="tickpill" hidden></span> <span id="ocAsOf"></span></span></div>
     <div class="card" id="ocCard" style="padding:0"><div class="empty">Loading…</div></div>
+   </div>
+   <div class="ws-news">
+    <div class="gh">News <span id="newsAsOf"></span></div>
+    <div class="card" id="newsCard" style="padding:0"><div class="empty">Loading news…</div></div>
    </div>
   </section>
 
@@ -1558,7 +1576,42 @@ function renderOC() {
     ${rows}
     <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target and stop use your 20–30% / 10–15% rule on the last traded premium.</div>`;
 }
-async function showOC() { try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
+async function showOC() { showNews(); try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
+
+/* ---------- NEWS (desktop right panel) ---------- */
+const NEWS = new Map();   // sym -> { d, got }
+async function loadNews(sym, force = false) {
+  const c = NEWS.get(sym); if (!force && c && Date.now() - c.got < 3 * 60e3) return c.d;
+  const f = encodeURIComponent(sym) + ".json", pj = t => { try { return t ? JSON.parse(t) : null; } catch { return null; } };
+  const [a, b] = await Promise.all([file("news/" + f, "live").catch(() => null), file("data/news/" + f).catch(() => null)]);
+  const A = pj(a), B = pj(b), d = A && B ? (A.at >= B.at ? A : B) : (A || B);
+  NEWS.set(sym, { d, got: Date.now() }); return d;
+}
+function agoTxt(t) {
+  const m = (Date.now() / 1000 - t) / 60;
+  if (m < 1) return "just now"; if (m < 60) return Math.round(m) + "m ago"; if (m < 1440) return Math.round(m / 60) + "h ago";
+  return niceDate(ist(new Date(t * 1000)).date);
+}
+async function showNews(force = false) {
+  if (!S.desk || !S.sym || !S.token) return;
+  const sym = S.sym; let d = null, err = "";
+  if (!NEWS.has(sym)) { $("#newsCard").innerHTML = `<div class="empty">Loading news…</div>`; $("#newsAsOf").textContent = ""; }
+  try { d = await loadNews(sym, force); } catch (e) { err = e.message; }
+  if (S.sym === sym) renderNews(sym, d, err);
+}
+function renderNews(sym, d, err) {
+  const q = encodeURIComponent((d?.q || `"${sym}" share`).replace(/\s*when:\d+d/, ""));
+  const foot = `<div class="newsfoot">More: <a href="https://news.google.com/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en" target="_blank" rel="noopener">Google News</a> · <a href="https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}" target="_blank" rel="noopener">NSE announcements</a></div>`;
+  $("#newsAsOf").textContent = d?.at ? "checked " + agoTxt(d.at) : "";
+  const items = d?.items || [];
+  let body;
+  if (err) body = `<div class="empty">${esc(err)}</div>`;
+  else if (!d) body = `<div class="empty">No news saved for ${esc(sym)} yet. Headlines are fetched before the open, at day end, and during the live watch for stocks near or past a level.</div>`;
+  else if (!items.length) body = `<div class="empty">No headlines for ${esc(sym)} in the last 7 days.</div>`;
+  else body = items.map(x => `<a class="ni${Date.now() / 1000 - x.t < 86400 ? " new" : ""}" href="${esc(x.u)}" target="_blank" rel="noopener"><b>${esc(x.h)}</b><small>${x.tag ? `<span class="ntag ${esc(x.tag)}">${esc(x.tag)}</span>` : ""}${esc(x.s || "")}${x.t ? " · " + agoTxt(x.t) : ""}</small></a>`).join("");
+  $("#newsCard").innerHTML = body + foot;
+}
+setInterval(() => { if (S.desk && document.body.classList.contains("mkt") && document.visibilityState === "visible") showNews(true); }, 5 * 60e3);
 
 function readout() {
   const G = S.geo, el = $("#readout"); if (!G) return;
@@ -1671,7 +1724,7 @@ function toast(msg, ms = 3500) { $$(".toast").forEach(t => t.remove()); const t 
 
 document.addEventListener("click", e => {
   const tb = e.target.closest(".tabs button"); if (tb) return go(tb.dataset.tab);
-  if (e.target.closest("#deskBtn")) { S.desk = !S.desk; store.set("desk", S.desk ? "1" : "0"); applyDesk(); paintChartControls(); go(S.tab === "chart" && S.desk ? "live" : S.tab); renderLive(); renderOC(); requestAnimationFrame(() => drawChart()); return; }
+  if (e.target.closest("#deskBtn")) { S.desk = !S.desk; store.set("desk", S.desk ? "1" : "0"); applyDesk(); paintChartControls(); go(S.tab === "chart" && S.desk ? "live" : S.tab); renderLive(); renderOC(); showNews(); requestAnimationFrame(() => drawChart()); return; }
   const ext = e.target.closest("[data-exp]"); if (ext) { S.expSel = { ...(S.expSel || {}), [S.sym]: ext.dataset.exp }; renderOC(); tkResubscribe(); return; }
   const chp = e.target.closest("[data-ch]"); if (chp) { const [side, i] = chp.dataset.ch.split(":"); S.chainSel = { side, i: +i }; return renderOC(); }
   const jv = e.target.closest("#jViewSeg button"); if (jv) { S.jView = jv.dataset.jv; return renderJournal(); }
@@ -1736,7 +1789,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-28.3";
+const APP_VERSION = "2026-10-29.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
