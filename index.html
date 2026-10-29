@@ -1601,7 +1601,7 @@ async function showNews(force = false) {
 }
 function renderNews(sym, d, err) {
   const q = encodeURIComponent((d?.q || `"${sym}" share`).replace(/\s*when:\d+d/, ""));
-  const foot = `<div class="newsfoot">More: <a href="https://news.google.com/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en" target="_blank" rel="noopener">Google News</a> · <a href="https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}" target="_blank" rel="noopener">NSE announcements</a></div>`;
+  const foot = `<div class="newsfoot">More: <a href="https://news.google.com/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en" target="_blank" rel="noopener">Google News</a> · <a href="https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}" target="_blank" rel="noopener">NSE announcements</a> · <a href="#" data-newsfetch="${esc(sym)}">Fetch now</a></div>`;
   $("#newsAsOf").textContent = d?.at ? "checked " + agoTxt(d.at) : "";
   const items = d?.items || [];
   let body;
@@ -1611,6 +1611,14 @@ function renderNews(sym, d, err) {
   else body = items.map(x => `<a class="ni${Date.now() / 1000 - x.t < 86400 ? " new" : ""}" href="${esc(x.u)}" target="_blank" rel="noopener"><b>${esc(x.h)}</b><small>${x.tag ? `<span class="ntag ${esc(x.tag)}">${esc(x.tag)}</span>` : ""}${esc(x.s || "")}${x.t ? " · " + agoTxt(x.t) : ""}</small></a>`).join("");
   $("#newsCard").innerHTML = body + foot;
 }
+async function fetchNewsNow(sym) {
+  try {
+    await gh(`/repos/${S.repo}/actions/workflows/news.yml/dispatches`, { method: "POST", body: { ref: "main", inputs: { symbols: sym } } });
+    toast(`Fetching news for ${sym}; it shows here in about a minute.`);
+    for (const wait of [70e3, 110e3]) setTimeout(() => { if (S.sym === sym) showNews(true); }, wait);
+  } catch (e) { toast(e.message); }
+}
+document.addEventListener("click", e => { const a = e.target.closest("[data-newsfetch]"); if (a) { e.preventDefault(); fetchNewsNow(a.dataset.newsfetch); } });
 setInterval(() => { if (S.desk && document.body.classList.contains("mkt") && document.visibilityState === "visible") showNews(true); }, 5 * 60e3);
 
 function readout() {
@@ -1789,7 +1797,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-29.1";
+const APP_VERSION = "2026-10-29.2";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
