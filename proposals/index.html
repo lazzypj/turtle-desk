@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposal Desk Tracker</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --navy:#0f1f3d; --navy-2:#1c3260; --crimson:#a3122a; --ink:#16181d; --muted:#5d6472;
+  --line:#e3e1db; --paper:#f7f5f0; --card:#ffffff; --chip:#eceae4; --shadow:0 1px 2px rgba(15,31,61,.06),0 4px 14px rgba(15,31,61,.05);
+  --won:#1f7a4d; --lost:#8a8f99; --hold:#9a6b00; --issue:#2a5bd7;
+}
+@media (prefers-color-scheme:dark){
+  :root{--ink:#eceef2; --muted:#9aa2b1; --line:#2a2f3a; --paper:#111419; --card:#181c23; --chip:#232834;
+    --navy:#0b1630; --crimson:#e0475f; --shadow:none; --won:#46c08a; --hold:#e0b14a; --issue:#7aa2ff;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px 64px}
+header.top{background:var(--navy);color:#fff;padding:22px 0 18px;border-bottom:3px solid var(--crimson)}
+header.top .wrap{padding-bottom:0}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;font-weight:600}
+h1{font:600 26px/1.2 "Source Serif 4",Georgia,serif;margin:4px 0 14px}
+.stats{display:flex;gap:22px;flex-wrap:wrap}
+.stat b{display:block;font:600 22px/1 "Source Serif 4",serif}
+.stat span{font-size:12px;opacity:.75}
+.controls{position:sticky;top:0;z-index:5;background:var(--paper);padding:14px 0 10px;border-bottom:1px solid var(--line)}
+input[type=search]{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;outline:none}
+input[type=search]:focus{border-color:var(--navy-2);box-shadow:0 0 0 3px rgba(28,50,96,.12)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-top:10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font:500 13px Inter,sans-serif;cursor:pointer}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip .n{opacity:.6;margin-left:4px}
+.list{display:grid;gap:10px;margin-top:14px}
+.card{display:block;text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);position:relative}
+.card:active{transform:scale(.995)}
+.client{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--crimson);font-weight:600}
+.card h3{font:600 17px/1.3 "Source Serif 4",Georgia,serif;margin:3px 0 8px}
+.meta{display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.pill{display:inline-block;border-radius:6px;padding:1px 8px;font-size:11.5px;font-weight:600;background:var(--chip);color:var(--ink)}
+.pill.Won{background:color-mix(in srgb,var(--won) 16%,transparent);color:var(--won)}
+.pill.Lost{color:var(--lost)}
+.pill.On.hold,.pill.hold{background:color-mix(in srgb,var(--hold) 16%,transparent);color:var(--hold)}
+.pill.Submitted,.pill.issue{background:color-mix(in srgb,var(--issue) 14%,transparent);color:var(--issue)}
+.pill.Drafting{background:color-mix(in srgb,var(--crimson) 12%,transparent);color:var(--crimson)}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+/* detail */
+.back{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:500;font-size:14px;color:#fff;opacity:.85;margin-bottom:10px}
+.lede{color:#dfe5f2;font-size:13.5px}
+section{margin-top:26px}
+h2{font:600 13px Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.summary{font-size:15.5px;margin:0}
+.open li{margin:4px 0}
+.open{padding-left:18px;margin:0}
+.open li::marker{color:var(--crimson)}
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;align-items:start}
+.top .pill{background:rgba(255,255,255,.14)!important;color:#fff!important}
+.doc{text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.thumb{aspect-ratio:16/10;background:var(--chip) center/cover no-repeat;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
+.thumb.portrait{aspect-ratio:3/4;background-position:top center}
+.doc .b{padding:9px 11px 11px}
+.doc .t{font-weight:600;font-size:13.5px;line-height:1.3}
+.doc .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.timeline{border-left:2px solid var(--line);margin-left:6px;padding-left:18px}
+.sess{position:relative;padding-bottom:20px}
+.sess::before{content:"";position:absolute;left:-25px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--crimson)}
+.sess .d{font-size:12px;color:var(--muted);font-weight:500}
+.sess .h{font-weight:600;margin:1px 0 3px}
+.sess p{margin:0 0 6px;font-size:14px}
+.sess .links{display:flex;gap:6px;flex-wrap:wrap}
+.lnk{font-size:12.5px;font-weight:500;text-decoration:none;border:1px solid var(--line);border-radius:7px;padding:3px 9px;background:var(--card)}
+.lnk.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.note{font-size:13px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:12px 14px}
+/* viewer */
+.vbar{position:sticky;top:0;z-index:6;background:var(--navy);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.vbar a{color:#fff;text-decoration:none;font-weight:500;flex:none}
+.vbar .vt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:600}
+.vbar .pc{flex:none;font-size:12px;opacity:.8}
+.pages{max-width:1000px;margin:0 auto;padding:14px 10px 70px;display:grid;gap:12px}
+.pages img{width:100%;height:auto;display:block;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.12),0 6px 20px rgba(0,0,0,.06);min-height:120px}
+.vfoot{text-align:center;margin-top:8px}
+.doc{position:relative}
+.doc>a{text-decoration:none;display:flex;flex-direction:column;flex:1}
+.doc.old{opacity:.72}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-radius:5px;padding:1px 6px;margin-right:4px;vertical-align:1px}
+.tag.latest{background:color-mix(in srgb,var(--won) 15%,transparent);color:var(--won)}
+.tag.earlier{background:var(--chip);color:var(--muted)}
+.acts{padding:0 11px 11px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 11px;font:500 13px Inter,sans-serif;cursor:pointer;text-decoration:none}
+.btn.full{width:100%;justify-content:center}
+.btn.light{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
+.btn:disabled{opacity:.55;cursor:default}
+.no-dl{display:none!important}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.thumb img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;opacity:0;transition:opacity .2s}
+.thumb img.ok,.pages img.ok{opacity:1}
+.pages img{opacity:.0;transition:opacity .2s}
+.pages img.deck{aspect-ratio:auto 16/9}.pages img.page{aspect-ratio:auto 1/1.414}
+.steps{padding-left:20px;margin:10px 0 14px}.steps li{margin:6px 0}
+input[type=password]{width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+.errmsg{color:var(--crimson);font-weight:500}
+.foot-acts{display:flex;gap:14px;justify-content:center;margin-top:6px}
+.foot-acts a{cursor:pointer}
+.hbar{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+footer{font-size:11.5px;color:var(--muted);text-align:center;margin-top:36px}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div id="app"><div class="wrap"><p class="empty">Loading…</p></div></div>
+<script>
+const app = document.getElementById('app');
+let DATA = null, state = {q:'', stage:'All'};
+try { const s = JSON.parse(localStorage.getItem('pt-filter') || '{}'); if (s.stage) state.stage = s.stage; } catch(e) {}
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = d => { if (!d) return ''; const x = new Date(d + (d.length === 10 ? 'T00:00:00' : '')); return isNaN(x) ? d : x.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}); };
+const pill = s => `<span class="pill ${esc((s||'').replace(/\s+/g,' '))}">${esc(s||'—')}</span>`;
+const prev = (p, d, n) => `data/previews/${p.id}/${d.id}/p-${String(n).padStart(3,'0')}.jpg`;
+const ACTIVE = ['Scoping','Drafting','Ready to issue','Submitted'];
+
+function haystack(p){
+  return [p.title,p.client,p.client_type,p.offering,p.stage,p.summary,...(p.open_items||[]),
+    ...p.documents.map(d=>[d.title,d.kind,d.text].join(' ')),
+    ...p.sessions.map(s=>[s.title,s.summary].join(' '))].join(' ').toLowerCase();
+}
+
+function home(){
+  const ps = DATA.proposals;
+  const counts = {}; ps.forEach(p => counts[p.stage] = (counts[p.stage]||0)+1);
+  const stages = ['All', ...DATA.stages.filter(s => counts[s])];
+  if (!stages.includes(state.stage)) state.stage = 'All';
+  const docs = ps.reduce((a,p)=>a+p.documents.length,0);
+  const sess = ps.reduce((a,p)=>a+p.sessions.length,0);
+  app.innerHTML = `
+  <header class="top"><div class="wrap">
+    <div class="eyebrow">Crisil Intelligence · FS Consulting</div>
+    <h1>Proposal Desk</h1>
+    <div class="stats">
+      <div class="stat"><b>${ps.filter(p=>ACTIVE.includes(p.stage)).length}</b><span>Active</span></div>
+      <div class="stat"><b>${counts.Won||0}</b><span>Won</span></div>
+      <div class="stat"><b>${docs}</b><span>Documents</span></div>
+      <div class="stat"><b>${sess}</b><span>Sessions logged</span></div>
+    </div>
+    ${docs ? `<div class="hbar"><button class="btn light" id="dlall">⬇ Download all latest (${ps.reduce((a,p)=>a+latestDocs(p).length,0)})</button></div>` : ''}
+  </div></header>
+  <div class="wrap">
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search client, topic, text inside documents…" value="${esc(state.q)}">
+      <div class="chips">${stages.map(s=>`<button class="chip ${s===state.stage?'on':''}" data-s="${esc(s)}">${esc(s)}<span class="n">${s==='All'?ps.length:counts[s]}</span></button>`).join('')}</div>
+    </div>
+    <div class="list" id="list"></div>
+    <footer>Synced ${esc(fmt(DATA.generated.slice(0,10)))} · ${esc(DATA.generated.slice(11,16))} IST · <a href="${esc(DATA.repo)}">GitHub repo</a>
+      <div class="foot-acts"><a id="refresh">Refresh</a><a id="signout">Sign out</a></div></footer>
+  </div>`;
+  const q = document.getElementById('q');
+  q.addEventListener('input', () => { state.q = q.value; renderList(); });
+  app.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    state.stage = b.dataset.s; try{localStorage.setItem('pt-filter', JSON.stringify({stage:state.stage}))}catch(e){}
+    app.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on', x===b)); renderList();
+  });
+  document.getElementById('refresh').onclick = () => { blobCache.clear(); load(); };
+  document.getElementById('signout').onclick = signout;
+  const b = document.getElementById('dlall');
+  if (b) b.onclick = () => saveZip('Proposal Desk - latest documents', ps.flatMap(p => latestDocs(p).map(d => ({p, d}))), b);
+  renderList();
+}
+
+function renderList(){
+  const terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const ps = DATA.proposals.filter(p => (state.stage==='All' || p.stage===state.stage) && terms.every(t => p._h.includes(t)));
+  document.getElementById('list').innerHTML = ps.length ? ps.map(p => `
+    <a class="card" href="#p-${p.id}">
+      <div class="client">${esc(p.client)}</div>
+      <h3>${esc(p.title)}</h3>
+      <div class="meta">${pill(p.stage)}<span>${esc(p.offering||'')}</span><span>· ${p.documents.length} doc${p.documents.length===1?'':'s'}</span><span>· ${p.sessions.length} session${p.sessions.length===1?'':'s'}</span><span>· ${esc(fmt(p.updated))}</span></div>
+    </a>`).join('') : `<p class="empty">No proposals match.</p>`;
+}
+
+function docCard(p, d){
+  const portrait = d.kind === 'Document' || d.kind === 'PDF';
+  const img = d.pages ? `<img data-src="${prev(p,d,1)}" alt="">` : '';
+  const label = d.pages ? '' : (d.missing ? 'File not found' : d.error ? 'No preview' : 'No preview');
+  return `<div class="doc ${d.latest?'':'old'}"><a href="#d-${p.id}--${d.id}">
+    <div class="thumb ${portrait?'portrait':''}">${img || label}</div>
+    <div class="b"><div class="t">${d.missing?'':`<span class="tag ${d.latest?'latest':'earlier'}">${d.latest?'Latest':'Earlier'}</span>`}${esc(d.title)}</div>
+    <div class="s">${esc([d.kind, d.version, fmt(d.date), d.pages ? d.pages + (d.kind==='Deck'?' slides':' pages') : '', size(d.size)].filter(Boolean).join(' · '))}</div></div></a>
+    ${!d.missing ? `<div class="acts"><button class="btn full" data-dl="${p.id}--${d.id}">⬇ Download</button><a class="btn full no-dl" href="${esc(d.url)}" target="_blank" rel="noopener">Open on GitHub ↗</a></div>` : ''}</div>`;
+}
+
+function detail(id){
+  const p = DATA.proposals.find(x => x.id === id);
+  if (!p) return notFound();
+  const byId = Object.fromEntries(p.documents.map(d => [d.id, d]));
+  app.innerHTML = `
+  <header class="top"><div class="wrap">
+    <a class="back" href="#">‹ All proposals</a>
+    <div class="eyebrow">${esc(p.client)}${p.client_type && p.client_type !== p.client ? ' · ' + esc(p.client_type) : ''}</div>
+    <h1>${esc(p.title)}</h1>
+    <div class="meta lede">${pill(p.stage)}<span>${esc(p.offering||'')}</span><span>· Updated ${esc(fmt(p.updated))}</span></div>
+    ${latestDocs(p).length ? `<div class="hbar"><button class="btn light" id="dlp">⬇ Download latest (${latestDocs(p).length})</button></div>` : ''}
+  </div></header>
+  <div class="wrap">
+    <section><h2>Summary</h2><p class="summary">${esc(p.summary||'')}</p></section>
+    ${p.open_items?.length ? `<section><h2>Open items</h2><ul class="open">${p.open_items.map(o=>`<li>${esc(o)}</li>`).join('')}</ul></section>` : ''}
+    <section><h2>Documents</h2>${p.documents.length ? `<div class="docs">${p.documents.slice().sort((a,b)=>(b.latest-a.latest)||(b.date||'').localeCompare(a.date||'')).map(d=>docCard(p,d)).join('')}</div>`
+      : `<div class="note">No documents yet. They appear here after a Proposal desk session logs them, or when a file is uploaded to <a href="${esc(DATA.repo)}/tree/main/proposals/${p.id}/docs">proposals/${p.id}/docs</a> and the tracker is synced.</div>`}</section>
+    <section><h2>Sessions</h2>${p.sessions.length ? `<div class="timeline">${p.sessions.map(s=>`
+      <div class="sess"><div class="d">${esc(fmt(s.date))}</div><div class="h">${esc(s.title||'Session')}</div>
+        ${s.summary?`<p>${esc(s.summary)}</p>`:''}
+        ${s.decisions?.length?`<p><b>Decided:</b> ${s.decisions.map(esc).join('; ')}</p>`:''}
+        <div class="links">${s.chat_url?`<a class="lnk primary" href="${esc(s.chat_url)}" target="_blank" rel="noopener">Open chat ↗</a>`:''}
+        ${(s.docs||[]).filter(x=>byId[x]).map(x=>`<a class="lnk" href="#d-${p.id}--${x}">${esc(byId[x].title)}</a>`).join('')}</div>
+      </div>`).join('')}</div>`
+      : `<div class="note">No sessions logged yet. Discussions before the tracker was set up are summarised above; new Proposal desk sessions add themselves here.</div>`}</section>
+    <footer><a href="${esc(DATA.repo)}/blob/main/proposals/${p.id}/proposal.json">Edit on GitHub</a></footer>
+  </div>`;
+  const b = document.getElementById('dlp');
+  if (b) b.onclick = () => { const L = latestDocs(p); L.length === 1 ? saveOne(p, L[0], b) : saveZip(p.client + ' - ' + p.title, L.map(d => ({p, d})), b, true); };
+  wireDocButtons(); hydrate();
+  window.scrollTo(0,0);
+}
+
+function viewer(pid, did){
+  const p = DATA.proposals.find(x => x.id === pid), d = p && p.documents.find(x => x.id === did);
+  if (!d) return notFound();
+  const pages = Array.from({length: d.pages}, (_, i) => i + 1);
+  app.innerHTML = `
+  <div class="vbar"><a href="#p-${p.id}">‹ Back</a><div class="vt">${esc(d.title)}</div><div class="pc" id="pc">${d.pages ? '1 / ' + d.pages : ''}</div>${!d.missing?`<button class="btn light" id="dlv" style="padding:4px 10px">⬇</button>`:''}</div>
+  <div class="pages">
+    ${d.pages ? pages.map(n => `<img class="${d.kind==='Deck'?'deck':'page'}" decoding="async" data-n="${n}" data-src="${prev(p,d,n)}" alt="Page ${n}">`).join('')
+      : `<div class="note">${d.missing ? 'This file is listed but was not found in the repo.' : 'A preview could not be generated for this file.'} Open the original on GitHub instead.</div>`}
+    <div class="vfoot"><a class="lnk" href="${esc(d.url)}" target="_blank" rel="noopener">Open original on GitHub ↗</a></div>
+  </div>`;
+  const bv = document.getElementById('dlv'); if (bv) bv.onclick = () => saveOne(p, d, bv);
+  hydrate();
+  window.scrollTo(0,0);
+  if (d.pages){
+    const pc = document.getElementById('pc'), imgs = [...app.querySelectorAll('.pages img')];
+    window.onscroll = () => { let n = 1; for (const i of imgs) { if (i.getBoundingClientRect().top < innerHeight * 0.4) n = i.dataset.n; else break; } pc.textContent = n + ' / ' + d.pages; };
+  } else window.onscroll = null;
+}
+
+const size = n => !n ? '' : n < 1048576 ? Math.round(n/1024) + ' KB' : (n/1048576).toFixed(1) + ' MB';
+const latestDocs = p => p.documents.filter(d => d.latest && !d.missing);
+const safe = s => String(s).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 90);
+let toastT;
+function toast(m, ms=2600){ const t = document.getElementById('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); if (ms) toastT = setTimeout(() => t.classList.remove('on'), ms); }
+
+/* ---------- GitHub access (private repo, read-only token kept on this device) ---------- */
+const REPO = 'lazzypj/proposal-tracker';
+let TOKEN = null, TD_TOKEN = null; try { TOKEN = localStorage.getItem('pt-token'); TD_TOKEN = localStorage.getItem('td_token'); } catch(e) {}
+async function gh(path, as){
+  const url = `https://api.github.com/repos/${REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=main`;
+  const r = await fetch(url, {headers: {Authorization: 'Bearer ' + TOKEN, Accept: 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28'}, cache: 'no-store'});
+  if (r.status === 401) throw {auth: 'expired'};
+  if (r.status === 404 && path === 'data/index.json') throw {auth: 'noaccess'};
+  if (!r.ok) throw new Error('GitHub ' + r.status);
+  return as === 'blob' ? r.blob() : r.json();
+}
+const blobCache = new Map();
+const ghURL = path => { if (!blobCache.has(path)) blobCache.set(path, gh(path, 'blob').then(b => URL.createObjectURL(b))); return blobCache.get(path); };
+let io;
+function hydrate(){
+  if (io) io.disconnect();
+  io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return; const el = e.target; io.unobserve(el);
+    ghURL(el.dataset.src).then(u => { el.src = u; el.classList.add('ok'); }).catch(() => el.classList.add('err'));
+  }), {rootMargin: '800px 0px'});
+  app.querySelectorAll('img[data-src]').forEach(i => io.observe(i));
+}
+const fileBlob = (p, d) => gh(`proposals/${p.id}/${d.file}`, 'blob');
+function saveBlob(name, blob){
+  const u = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 60000);
+}
+async function guard(btn, fn){
+  const label = btn && btn.textContent; if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try { await fn(); } catch(e) { toast(e && e.auth ? 'GitHub token expired — sign in again' : 'Download failed — check your connection'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+}
+function saveOne(p, d, btn){
+  return guard(btn, async () => { saveBlob(d.filename, await fileBlob(p, d)); toast('Downloaded ' + d.filename); });
+}
+function saveZip(name, items, btn, flat){
+  return guard(btn, async () => {
+    if (!window.JSZip) throw new Error('zip');
+    const zip = new JSZip(), used = new Set();
+    for (const [i, {p, d}] of items.entries()) {
+      if (btn) btn.textContent = `Fetching ${i+1}/${items.length}…`;
+      let path = (flat ? '' : safe(p.client + ' - ' + p.title) + '/') + d.filename;
+      while (used.has(path)) path = path.replace(/(\.[^.]+)$/, '_$1');
+      used.add(path); zip.file(path, await fileBlob(p, d));
+    }
+    if (btn) btn.textContent = 'Zipping…';
+    const fn = safe(name) + ' (' + new Date().toISOString().slice(0,10) + ').zip';
+    saveBlob(fn, await zip.generateAsync({type:'blob'})); toast('Downloaded ' + fn);
+  });
+}
+function wireDocButtons(){
+  app.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => {
+    const [pid, did] = b.dataset.dl.split('--'); const p = DATA.proposals.find(x => x.id === pid);
+    saveOne(p, p.documents.find(x => x.id === did), b);
+  });
+}
+
+function notFound(){ app.innerHTML = `<div class="wrap"><p class="empty">Not found. <a href="#">Back to all proposals</a></p></div>`; }
+
+function route(){
+  window.onscroll = null;
+  const h = location.hash.slice(1);
+  if (h.startsWith('d-')) { const [pid, did] = h.slice(2).split('--'); viewer(pid, did); }
+  else if (h.startsWith('p-')) detail(h.slice(2));
+  else home();
+}
+
+function signin(msg){
+  app.innerHTML = `
+  <header class="top"><div class="wrap"><div class="eyebrow">Crisil Intelligence · FS Consulting</div><h1>Proposal Desk</h1></div></header>
+  <div class="wrap"><section>
+    <h2>Connect to GitHub</h2>
+    ${msg ? `<p class="errmsg">${esc(msg)}</p>` : ''}
+    <p>Your proposals stay in the private <b>proposal-tracker</b> repo. This app reads them with a read-only GitHub token, saved only on this device.</p>
+    <ol class="steps">
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token ↗</a></li>
+      <li><b>Repository access</b>: Only select repositories → <b>proposal-tracker</b></li>
+      <li><b>Permissions → Contents</b>: Read-only. Pick an expiry (e.g. 1 year).</li>
+      <li>Generate, copy, and paste it here.</li>
+    </ol>
+    ${TD_TOKEN ? `<button class="btn full" id="usetd" style="margin-bottom:12px">Use my Turtle Desk token</button>
+    <p style="font-size:13px;color:var(--muted);margin-top:-4px">Works if that token also has access to <b>proposal-tracker</b>: on GitHub, edit the token → Repository access → add proposal-tracker (Contents: Read-only). Or create a separate token below.</p>` : ''}
+    <input type="password" id="tok" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="btn full primary" id="go" style="margin-top:10px">Connect</button>
+  </section></div>`;
+  const go = document.getElementById('go'), tok = document.getElementById('tok');
+  go.onclick = () => { const t = tok.value.trim(); if (!t) return; TOKEN = t; try { localStorage.setItem('pt-token', t); } catch(e) {} load(); };
+  tok.onkeydown = e => { if (e.key === 'Enter') go.click(); };
+  const td = document.getElementById('usetd'); if (td) td.onclick = () => { tok.value = TD_TOKEN; go.click(); };
+}
+function signout(){ try { localStorage.removeItem('pt-token'); } catch(e) {} TOKEN = null; blobCache.clear(); location.hash = ''; signin(); }
+
+async function load(){
+  if (!TOKEN) return signin();
+  app.innerHTML = '<div class="wrap"><p class="empty">Loading from GitHub…</p></div>';
+  try {
+    DATA = await gh('data/index.json');
+    DATA.proposals.forEach(p => p._h = haystack(p));
+    route();
+  } catch(e) {
+    if (e && e.auth === 'expired') { try { localStorage.removeItem('pt-token'); } catch(_) {} return signin('That token was rejected or has expired. Create a new one.'); }
+    if (e && e.auth === 'noaccess') return signin('The token cannot see the proposal-tracker repo. Check that it was given access to that repository with Contents: Read-only.');
+    app.innerHTML = '<div class="wrap"><p class="empty">Could not reach GitHub. <a href="#" onclick="load();return false">Try again</a></p></div>';
+  }
+}
+window.addEventListener('hashchange', () => DATA && route());
+load();
+</script>
+</body>
+</html>
