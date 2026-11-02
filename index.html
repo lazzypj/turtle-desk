@@ -228,6 +228,8 @@ body.desk.mkt .ws-levels .kv span:first-child { white-space: nowrap; }
 .mkt-bias { font-size: 13px; color: var(--ink2); }
 .tagc { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--fill); color: var(--ink2); margin-left: 2px; vertical-align: 1px; }
 .tagc.fresh { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.tagc.avoid { background: color-mix(in srgb, var(--down) 16%, transparent); color: var(--down); }
+.tagc.caution { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
 
 /* journal */
 .jnav { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 0; }
@@ -519,7 +521,7 @@ const S = {
   token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
-  brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1",
+  brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1", hideAvoid: store.get("hideAvoid", "0") === "1",
   jView: "month", jAnchor: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()), jDay: null, journal: null,
   sym: store.get("sym", ""), n: +store.get("n", "120") || 120, desk: store.get("desk", "") ? store.get("desk") === "1" : window.innerWidth >= 1200,
   iv: "1D", mas: (store.get("mas", "MA20,MA50") || "").split(",").filter(Boolean), turtle: store.get("turtle", "0") === "1", pat: store.get("pat", "1") === "1", vol: store.get("vol", "1") === "1", bars: {}, barsErr: "", mode: null, sample: false, err: "", hover: null, geo: null,
@@ -672,11 +674,27 @@ function renderMarket() {
     <div class="mkt-bias">Breaks <b class="up">▲${up}</b> <b class="down">▼${dn}</b> · fresh after ${esc(L.quiet_until || "09:18")} <b class="up">▲${upF}</b> <b class="down">▼${dnF}</b>${bias ? ` · ${bias}` : ""}</div>`;
   el.hidden = false;
 }
+/* Warning tags from the 27 Oct - 2 Nov review: avoid = opened beyond the level / already 3%+ on the day;
+   caution = broke before 09:30 / break-minute volume 10x or more. Breaks carry them in r.warn (from the
+   live watch); near stocks get the "already moved" one from today's change. */
+function warnInfo(r) {
+  const L = S.live || {}, ext = L.ext_pct || 3, dir = r.side === "UP" ? 1 : -1;
+  let codes = r.vt === 2 ? (r.warn || (r.gap ? ["gap"] : [])) : [];
+  if (r.vt === 1 && r.chg != null && dir * r.chg >= ext) codes = ["ext"];
+  const chg = r.vt === 2 && r.brk_chg != null ? r.brk_chg : r.chg, mv = r.brk_mvol ?? r.mvol;
+  const txt = { gap: "gap", ext: chg != null ? pct(chg, 1) : ext + "%+", early: `<${esc((L.early_until || "09:30").replace(/^0/, ""))}`, spike: `vol ${mv != null ? Math.round(mv) + "×" : "spike"}` };
+  const avoid = codes.filter(c => c === "gap" || c === "ext"), caution = codes.filter(c => c === "early" || c === "spike");
+  const full = { gap: "opened past the level", ext: `already ${txt.ext} on the day`, early: `before ${esc(L.early_until || "09:30")}`, spike: `volume spike${mv != null ? " " + Math.round(mv) + "×" : ""}` };
+  return { avoid: avoid.length > 0, caution: caution.length > 0,
+    html: (avoid.length ? `<span class="tagc avoid">Avoid ${avoid.map(c => txt[c]).join(" ")}</span>` : "") + (caution.length ? `<span class="tagc caution">${caution.map(c => txt[c]).join(" ")}</span>` : ""),
+    avoidText: avoid.length ? "avoid: " + avoid.map(c => full[c]).join(", ") : "", cautionText: caution.length ? "caution: " + caution.map(c => full[c]).join(", ") : "" };
+}
 function renderLive() {
   const L = S.live, ls = liveState();
-  const rows = liveRows().filter(r => !(S.hideOpen && r.vt === 2 && (r.gap || r.opening)));
+  const rows = liveRows().map(r => ({ ...r, wi: warnInfo(r) }))
+    .filter(r => !(S.hideOpen && r.vt === 2 && (r.gap || r.opening)) && !(S.hideAvoid && r.wi.avoid));
   renderMarket();
-  $("#liveChips").innerHTML = `<button class="chip" data-lopt="brkOnly" aria-pressed="${S.brkOnly}"><i style="background:var(--down)"></i>Breaks only</button><button class="chip" data-lopt="hideOpen" aria-pressed="${S.hideOpen}"><i style="background:var(--ink3)"></i>Hide opening &amp; gap moves</button>`;
+  $("#liveChips").innerHTML = `<button class="chip" data-lopt="brkOnly" aria-pressed="${S.brkOnly}"><i style="background:var(--down)"></i>Breaks only</button><button class="chip" data-lopt="hideOpen" aria-pressed="${S.hideOpen}"><i style="background:var(--ink3)"></i>Hide opening &amp; gap moves</button><button class="chip" data-lopt="hideAvoid" aria-pressed="${S.hideAvoid}"><i style="background:var(--down)"></i>Hide avoid</button>`;
   $("#liveCap").textContent = !L ? "No live run yet. Start one from Run." :
     ls.k === "sample" ? "Sample data" : ls.k === "live" ? `Updated ${ls.hm} · ${L.stocks} F&O stocks · near = ${L.near_atr}× ATR` :
     ls.k === "stopped" ? `Watch stopped at ${ls.hm} · ${L.stocks} F&O stocks` : `Last live run ${niceDate(L.date)}`;
@@ -685,13 +703,13 @@ function renderLive() {
     .map(([k, t, c]) => `<button data-lf="${k}" aria-pressed="${S.liveF === k}"><b class="${c}">${L ? n(k) : "–"}</b><small>${t}</small></button>`).join("");
   const keys = S.liveF ? [S.liveF] : Object.keys(GROUPS).filter(k => !S.brkOnly || k.endsWith("2"));
   $("#liveLists").innerHTML = !L ? `<div class="gh">Stocks</div><div class="list"><div class="empty">Nothing yet. Start a live watch from Run before 09:15.</div></div>` : keys.map(k => {
-    const sel = rows.filter(r => r.g === k).sort((a, b) => (b.fresh - a.fresh) || b.since.localeCompare(a.since));
+    const sel = rows.filter(r => r.g === k).sort((a, b) => (a.wi.avoid - b.wi.avoid) || (b.fresh - a.fresh) || b.since.localeCompare(a.since));
     const [name, side] = GROUPS[k];
     if (!sel.length && !S.liveF) return "";
     return `<div class="gh">${name} <span>${sel.length}</span></div><div class="list">${sel.length ? sel.map(r => {
       const d = (r.ltp / r.vl - 1) * 100, both = S.win === "all" && r.s55 && r.s20 && r.vw === 55 ? " · 20D too" : "";
       const [p, pc] = chgPill(r.chg);
-      const tag = r.vt === 2 ? (r.gap ? `<span class="tagc">Gap open</span>` : r.opening ? `<span class="tagc">Opening move</span>` : r.fresh ? `<span class="tagc fresh">Fresh</span>` : "") : "";
+      const tag = (r.vt === 2 ? (r.gap ? "" : r.opening ? `<span class="tagc">Opening move</span>` : r.fresh && !r.wi.avoid ? `<span class="tagc fresh">Fresh</span>` : "") : "") + r.wi.html;
       const vol = r.rvol != null ? `<span class="${r.rvol >= 2 ? "hot" : ""}">vol ${r.rvol.toFixed(1)}×</span>` : `<span class="${r.vol_pct >= 150 ? "hot" : ""}">vol ${(r.vol_pct / 100).toFixed(1)}× day avg</span>`;
       return cell({ sym: r.symbol, side, hollow: r.vt === 1, px: fmt(r.ltp), pill: p, pillCls: pc,
         meta: `${esc(r.since)} ${tag} · ${r.vw}D ${pct(d, 1)}${both} · ${vol}` });
@@ -700,7 +718,7 @@ function renderLive() {
   const ev = (L?.events || []).filter(e => S.win === "all" || String(e.window) === S.win).slice(0, 40);
   $("#alCount").textContent = ev.length ? `${ev.length} latest` : "";
   $("#alerts").innerHTML = ev.length ? ev.map(e => `<div class="al" data-sym="${esc(e.symbol)}" role="button" tabindex="0"><time>${esc(e.time)}</time>
-    <div class="w"><b>${esc(e.symbol)}</b> <span class="cap">${e.status === "BREAKOUT" ? (e.side === "UP" ? "crossed" : "broke") : "near"} ${e.window}D ${e.side === "UP" ? "high" : "low"} · ${fmt(e.ltp)}${e.gap ? " · gap open" : e.phase === "opening" || e.phase === "start" ? " · opening" : ""}</span></div>
+    <div class="w"><b>${esc(e.symbol)}</b> <span class="cap">${e.status === "BREAKOUT" ? (e.side === "UP" ? "crossed" : "broke") : "near"} ${e.window}D ${e.side === "UP" ? "high" : "low"} · ${fmt(e.ltp)}${e.gap ? " · gap open" : e.phase === "opening" || e.phase === "start" ? " · opening" : ""}${e.warn ? (() => { const w = warnInfo({ side: e.side, vt: 2, warn: e.warn.split(","), chg: null, brk_mvol: e.mvol }); return (w.avoidText ? ` · <span class="down">${w.avoidText}</span>` : "") + (w.cautionText ? ` · <span style="color:var(--amber)">${w.cautionText}</span>` : ""); })() : ""}</span></div>
     <span class="badge ${e.status === "BREAKOUT" ? e.side : "near"}">${e.status === "BREAKOUT" ? (e.side === "UP" ? "BREAKOUT" : "BREAKDOWN") : "NEAR"}</span></div>`).join("")
     : `<div class="empty">No alerts yet today.</div>`;
 }
@@ -1797,7 +1815,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-10-29.2";
+const APP_VERSION = "2026-11-02.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
