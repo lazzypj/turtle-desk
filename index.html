@@ -1260,14 +1260,14 @@ function jPeriod() {
 function renderJournal() {
   const el = $("#journalBody"); if (!el) return;
   if (!S.journal && S.jErr) { el.innerHTML = `<div class="list"><div class="empty bad">Could not read the journal: ${esc(S.jErr)}</div></div>`; return; }
-  if (!S.journal) { el.innerHTML = `<div class="list"><div class="empty">No journal yet. Your trades are saved automatically at the end of each live watch and by the day-end scan.</div></div>`; return; }
+  if (!S.journal) { el.innerHTML = `<div class="list"><div class="empty">No journal yet. Your trades are pulled in every 2 minutes while the live watch runs, and again by the day-end scan.</div></div>`; return; }
   const P = jPeriod(), st = jStats(P.trips);
   $$("#jViewSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.jv === S.jView));
   $("#jLabel").textContent = P.label; $("#jPrev").hidden = $("#jNext").hidden = S.jView === "all";
   // summary
   const tile = (k, v, cls = "") => `<div><small>${k}</small><b class="${cls}">${v}</b></div>`;
   let html = `<div class="card jsum">
-      <div class="jbig"><small>Net P&amp;L${S.journal.sample ? " · sample" : ""}</small><div class="big ${st.net > 0 ? "up" : st.net < 0 ? "down" : ""}">${st.n ? rupee(st.net) : "–"}</div>
+      <div class="jbig"><small>Net P&amp;L${S.journal.sample ? " · sample" : ""}${S.journal._live ? ` · <span class="up">●</span> live, updated ${ist(new Date(S.journal.updated)).hm}` : ""}</small><div class="big ${st.net > 0 ? "up" : st.net < 0 ? "down" : ""}">${st.n ? rupee(st.net) : "–"}</div>
         <div class="cap">${st.n ? `Gross ${rupee(st.gross)} · charges ≈ ₹${fmt(st.charges, 0)}` : "No closed trades in this period"}</div></div>
       <div class="jgrid">${tile("Trades", st.n || "–")}${tile("Win rate", st.n ? st.win.toFixed(0) + "%" : "–")}${tile("Days traded", st.days || "–")}
         ${tile("Avg win", rupee(st.avgWin), "up")}${tile("Avg loss", rupee(st.avgLoss), "down")}${tile("Avg hold", st.hold != null ? st.hold.toFixed(0) + " min" : "–")}</div></div>`;
@@ -1315,9 +1315,22 @@ function renderJournal() {
   html += `<p class="foot">Trades are pulled from Kite at the end of each live watch and by the day-end scan (Kite only shares the current day's trades, so run one of them on days you trade). Charges are estimates; your contract note has the exact figures.</p>`;
   el.innerHTML = html;
 }
+setInterval(() => { if (S.tab === "journal" && S.token && document.visibilityState === "visible" && liveState().k === "live") loadJournal(); }, 60e3);
 async function loadJournal() {
   if (!S.token) { S.journal = sampleJournal(); }
-  else { try { const t = await file("data/journal/journal.json"); S.journal = t ? JSON.parse(t.replace(/\bNaN\b|-?Infinity\b/g, "null")) : null; S.jErr = ""; } catch (e) { S.journal = null; S.jErr = e.message; } }
+  else {
+    const prevLast = (S.journal?.trips || []).map(t => t.date).sort().at(-1) || null;
+    const pj = t => t ? JSON.parse(t.replace(/\bNaN\b|-?Infinity\b/g, "null")) : null;
+    try {
+      // the live watch publishes JOURNAL.json every couple of minutes; the day-end copy lives on main. Use the newer one.
+      const [a, b] = await Promise.all([file("JOURNAL.json", "live").catch(() => null), file("data/journal/journal.json")]);
+      const A = pj(a), B = pj(b);
+      S.journal = A && B ? (new Date(A.updated) >= new Date(B.updated) ? A : B) : (A || B); S.jErr = "";
+      if (S.journal) S.journal._live = S.journal === A && liveState().k === "live";
+    } catch (e) { S.journal = null; S.jErr = e.message; }
+    const last = (S.journal?.trips || []).map(t => t.date).sort().at(-1) || null;
+    if (last && S.jDay && S.jDay === prevLast && last !== prevLast) { S.jDay = last; S.jAnchor = last; }   // follow a new trading day
+  }
   if (S.journal && !S.jDay) { const ds = (S.journal.trips || []).map(t => t.date).sort(); S.jDay = ds.at(-1) || null; if (S.jDay) S.jAnchor = S.jDay; }
   renderJournal();
 }
@@ -1815,7 +1828,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-11-02.1";
+const APP_VERSION = "2026-11-05.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
