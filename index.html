@@ -1357,7 +1357,9 @@ function chainExps(sym) {
 }
 function chainFor(sym) {
   const ex = chainExps(sym); if (!ex.length) return null;
-  const want = (S.expSel || {})[sym], def = S.oc.stocks[sym].exp;
+  const want = (S.expSel || {})[sym]; let def = S.oc.stocks[sym].exp;
+  // in expiry week Zerodha blocks fresh buys of stock options, so default to the next expiry
+  if (def && def !== "sample" && (dUTC(def) - dUTC(ist().date)) / 864e5 <= 6) { const nx = ex.find(e => e.exp > def); if (nx) def = nx.exp; }
   return ex.find(e => e.exp === want) || ex.find(e => e.exp === def) || ex[0];
 }
 
@@ -1828,7 +1830,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-11-05.1";
+const APP_VERSION = "2026-11-20.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
