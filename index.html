@@ -340,12 +340,16 @@ details[open] > summary { border-bottom: .5px solid var(--sep); }
 .tabs button[aria-current="page"] { color: var(--accent); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 12px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 500; z-index: 40; width: max-content; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { .dot.live, .round.spin svg { animation: none; } }
+/* view-only copy for friends */
+body.view .tabs button[data-tab="journal"], body.view .tabs button[data-tab="run"], body.view #s-journal, body.view #s-run,
+body.view .ws-side, body.view [data-newsfetch], body.view .newsfetch-sep { display: none !important; }
+.viewtag { font-size: 11px; font-weight: 700; letter-spacing: .02em; color: var(--ink2); background: var(--fill); border-radius: 6px; padding: 2px 7px; margin-left: 8px; vertical-align: middle; }
 </style>
 </head>
 <body>
 <header class="bar"><div class="wrap">
   <div class="grow">
-    <h1>Turtle Desk</h1>
+    <h1>Turtle Desk<span class="viewtag" hidden>View only</span></h1>
     <div class="status"><span class="dot" id="mDot"></span><span id="mTxt">NSE</span></div>
   </div>
   <button class="round" id="deskBtn" aria-label="Switch to desktop view" title="Desktop / phone view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button>
@@ -509,16 +513,20 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (v, d = 2) => (v == null || !isFinite(v)) ? "–" : Number(v).toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
 const pct = (v, d = 2) => (v == null || !isFinite(v)) ? "–" : (v > 0 ? "+" : "") + v.toFixed(d) + "%";
+// View-only copy for friends: same app under /view/, reading the public market-data feed (no token, no journal, no options, no controls)
+const VIEW = /\/view\/?(index\.html)?$/.test(location.pathname) || new URLSearchParams(location.search).has("view");
+const FEED = "https://raw.githubusercontent.com/lazzypj/turtle-desk/feed/";
+const SP = VIEW ? "tv_" : "td_";
 const store = {
-  get(k, d = "") { try { return localStorage.getItem("td_" + k) ?? d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem("td_" + k, v); } catch {} },
-  del(k) { try { localStorage.removeItem("td_" + k); } catch {} },
+  get(k, d = "") { try { return localStorage.getItem(SP + k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(SP + k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(SP + k); } catch {} },
 };
 const BREADTH_H = 150;
 const chartH = () => S.desk && S.tab !== "day" ? Math.max(220, Math.min(820, window.innerHeight - 300)) : 280;
 
 const S = {
-  token: store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
+  token: VIEW ? "view" : store.get("token"), repo: store.get("repo", "lazzypj/Turtle-strategy"), apiKey: store.get("apiKey"),
   tab: store.get("tab", "live"), win: "all", liveF: null, dayF: null,
   live: null, summary: [], signals: [], prices: null, pricesLoading: null,
   brkOnly: store.get("brkOnly", "0") === "1", hideOpen: store.get("hideOpen", "0") === "1", hideAvoid: store.get("hideAvoid", "0") === "1",
@@ -571,7 +579,14 @@ async function gh(path, { method = "GET", body, raw = false } = {}) {
   if (res.status === 204) return true;
   return raw ? res.text() : res.json();
 }
-const file = (path, ref = "main") => gh(`/repos/${S.repo}/contents/${path}?ref=${ref}`, { raw: true });
+const file = (path, ref = "main") => VIEW ? feedFile(path, ref) : gh(`/repos/${S.repo}/contents/${path}?ref=${ref}`, { raw: true });
+async function feedFile(path, ref) {
+  if (!["main", "live", "bars"].includes(ref)) return null;
+  const res = await fetch(`${FEED}${ref}/${path}?t=${Math.floor(Date.now() / 30e3)}`, { cache: "no-store" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Couldn't load data (${res.status}). Try again in a minute.`);
+  return res.text();
+}
 function csv(text) {
   if (!text) return [];
   const lines = text.trim().split(/\r?\n/), head = lines.shift().split(",");
@@ -1423,6 +1438,7 @@ function paintTickPill() {
   el.className = "tickpill " + cls; el.textContent = txt; el.hidden = !txt;
 }
 async function tkCredentials() {
+  if (VIEW) { tkSet("off"); return false; }
   const pin = store.get("tickPin"); if (!pin || !S.token) { tkSet("off"); return false; }
   const today = ist().date;
   if (TK.token && TK.date === today) return true;
@@ -1609,7 +1625,7 @@ function renderOC() {
     ${rows}
     <div class="ocfoot">Expiry ${d.exp === "sample" ? "sample" : niceDate(d.exp)}${days != null ? ` (${days} day${days === 1 ? "" : "s"} left)` : ""} · lot ${d.lot ?? "–"} · spot ${fmt(d.spot)} when captured. Target and stop use your 20–30% / 10–15% rule on the last traded premium.</div>`;
 }
-async function showOC() { showNews(); try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
+async function showOC() { showNews(); if (VIEW) return; try { await ensureOC(); } catch (e) { S.oc = null; } renderOC(); ensureTicks(S.sym); }
 
 /* ---------- NEWS (desktop right panel) ---------- */
 const NEWS = new Map();   // sym -> { d, got }
@@ -1634,7 +1650,7 @@ async function showNews(force = false) {
 }
 function renderNews(sym, d, err) {
   const q = encodeURIComponent((d?.q || `"${sym}" share`).replace(/\s*when:\d+d/, ""));
-  const foot = `<div class="newsfoot">More: <a href="https://news.google.com/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en" target="_blank" rel="noopener">Google News</a> · <a href="https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}" target="_blank" rel="noopener">NSE announcements</a> · <a href="#" data-newsfetch="${esc(sym)}">Fetch now</a></div>`;
+  const foot = `<div class="newsfoot">More: <a href="https://news.google.com/search?q=${q}&hl=en-IN&gl=IN&ceid=IN:en" target="_blank" rel="noopener">Google News</a> · <a href="https://www.nseindia.com/get-quotes/equity?symbol=${encodeURIComponent(sym)}" target="_blank" rel="noopener">NSE announcements</a><span class="newsfetch-sep"> · </span><a href="#" data-newsfetch="${esc(sym)}">Fetch now</a></div>`;
   $("#newsAsOf").textContent = d?.at ? "checked " + agoTxt(d.at) : "";
   const items = d?.items || [];
   let body;
@@ -1749,6 +1765,7 @@ async function refresh() {
 
 /* ---------- nav ---------- */
 function go(tab, fromChart = false) {
+  if (VIEW && (tab === "journal" || tab === "run")) tab = "live";
   S.tab = tab; store.set("tab", tab);
   const mkt = S.desk && (tab === "live" || tab === "chart");
   document.body.classList.toggle("mkt", mkt); document.documentElement.classList.toggle("mkt", mkt);
@@ -1830,7 +1847,7 @@ let deskT;
 window.addEventListener("resize", () => { if (!S.desk) return; clearTimeout(deskT); deskT = setTimeout(() => { if (document.body.classList.contains("mkt")) drawChart(); }, 120); });
 
 /* ---------- update check ---------- */
-const APP_VERSION = "2026-11-20.1";
+const APP_VERSION = "2026-11-25.1";
 async function checkUpdate() {
   try {
     const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
@@ -1860,7 +1877,8 @@ applyDesk();
 $("#repo").value = S.repo; $("#apiKey").value = S.apiKey;
 $("#verLine").textContent = "App version " + APP_VERSION;
 { const m = market(); if (m.k !== "closed") $("#mins").value = Math.max(5, Math.min(75, m.k === "pre" ? 75 : 930 - m.t.mins)); }
-go(["live", "day", "chart", "journal", "run"].includes(S.tab) ? S.tab : "live");
+if (VIEW) { document.body.classList.add("view"); $(".viewtag").hidden = false; document.title = "Turtle Desk · view"; }
+go((VIEW ? ["live", "day", "chart"] : ["live", "day", "chart", "journal", "run"]).includes(S.tab) ? S.tab : "live");
 refresh(); checkUpdate(); deepLink();
 setInterval(() => { paintStatus(); if (document.visibilityState === "visible" && S.token && market().k !== "closed" && S.tab !== "run") refresh(); }, 30000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { checkUpdate(); if (S.token) refresh(); } });
